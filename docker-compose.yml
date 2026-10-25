@@ -1,0 +1,70 @@
+services:
+  postgres:
+    build:
+      context: ./services/db
+      dockerfile: Dockerfile
+    container_name: fox_mlo_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fox_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fox_password}
+      POSTGRES_DB: ${POSTGRES_DB:-fox_mlo}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fox_user} -d ${POSTGRES_DB:-fox_mlo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fox_network
+
+  backend:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    container_name: fox_mlo_backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-fox_user}:${POSTGRES_PASSWORD:-fox_password}@postgres:5432/${POSTGRES_DB:-fox_mlo}
+      - PLUNET_BASE_URL=${PLUNET_BASE_URL:-https://portal.foxtranslations.com/}
+      - PLUNET_USERNAME=${PLUNET_USERNAME}
+      - PLUNET_PASSWORD=${PLUNET_PASSWORD}
+      - DEFAULT_DESTINATION_URL=${DEFAULT_DESTINATION_URL:-http://backend:8000/api/v1/etl/simulate-destination}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/backend/app:/app/app
+      - ./fixtures:/app/fixtures:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fox_network
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: fox_mlo_frontend
+    restart: unless-stopped
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/frontend/src:/app/src
+    depends_on:
+      - backend
+    networks:
+      - fox_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  fox_network:
+    driver: bridge
