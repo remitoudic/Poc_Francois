@@ -224,7 +224,7 @@ export default function App() {
       <section className="hero">
         <div className="hero-inner">
           <div className="hero-meta-tag">
-            DESIGN.MD // MINIMALISM &amp; SWISS STYLE // GRID SPECIFICATION
+            FOX TRANSLATIONS // ETL PIPELINE SYSTEM // PLUNET API v10.26.2
           </div>
           <h1>
             Welcome to <span>FOX MLO</span>
@@ -449,43 +449,45 @@ export default function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>ID</th>
+                        <th className="th-id">ID</th>
                         <th>JOB IDENTIFIER</th>
-                        <th>PAIR</th>
-                        <th>VOLUME</th>
-                        <th>PLUNET</th>
-                        <th>DESTINATION</th>
-                        <th>STATUS</th>
-                        <th>INSPECT</th>
+                        <th className="text-center">LANGUAGE PAIR</th>
+                        <th className="text-center">VOLUME</th>
+                        <th className="text-center">PLUNET ORDER</th>
+                        <th className="text-center">DESTINATION</th>
+                        <th className="text-center">STATUS</th>
+                        <th className="th-action">ACTION</th>
                       </tr>
                     </thead>
                     <tbody>
                       {jobs.map((j) => (
                         <tr key={j.id}>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>#{j.id}</td>
-                          <td style={{ fontWeight: 600 }}>{j.job_name}</td>
-                          <td>
-                            <span className="tag">{j.source_language} &rarr; {j.target_language}</span>
+                          <td className="td-id">#{j.id}</td>
+                          <td className="td-job-name" title={j.job_name}>{j.job_name}</td>
+                          <td className="text-center">
+                            <span className="tag tag-pair">{j.source_language} &rarr; {j.target_language}</span>
                           </td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{j.word_count}w / {j.segment_count}s</td>
-                          <td>
+                          <td className="text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+                            {j.word_count}w &bull; {j.segment_count}s
+                          </td>
+                          <td className="text-center">
                             {j.plunet_synced === 'SYNCED' ? (
-                              <span className="tag tag-success">#{j.plunet_order_id}</span>
+                              <span className="tag tag-plunet">#{j.plunet_order_id}</span>
                             ) : (
                               <span className="tag tag-warning">{j.plunet_synced}</span>
                             )}
                           </td>
-                          <td>
+                          <td className="text-center">
                             <span className={`tag ${j.destination_status_code === 200 ? 'tag-success' : 'tag-accent'}`}>
                               HTTP {j.destination_status_code || '---'}
                             </span>
                           </td>
-                          <td>
+                          <td className="text-center">
                             <span className={`tag ${j.status === 'COMPLETED' ? 'tag-success' : 'tag-warning'}`}>
                               {j.status}
                             </span>
                           </td>
-                          <td>
+                          <td className="td-action">
                             <button
                               className="btn btn-outline btn-sm"
                               onClick={() => handleViewJob(j.id)}
@@ -513,25 +515,25 @@ export default function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>RECEIPT</th>
-                        <th>JOB REF</th>
+                        <th className="th-id">RECEIPT</th>
+                        <th className="text-center">JOB REF</th>
                         <th>FILE IDENTIFIER</th>
-                        <th>LANGUAGE PAIR</th>
-                        <th>SEGMENTS</th>
-                        <th>PAYLOAD</th>
-                        <th>TIMESTAMP</th>
+                        <th className="text-center">LANGUAGE PAIR</th>
+                        <th className="text-center">SEGMENTS</th>
+                        <th className="text-center">PAYLOAD</th>
+                        <th className="text-center">TIMESTAMP</th>
                       </tr>
                     </thead>
                     <tbody>
                       {deliveries.map((d) => (
                         <tr key={d.id}>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>REC-{d.id}</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>JOB-{d.job_id}</td>
-                          <td style={{ fontWeight: 600 }}>{d.source_filename}</td>
-                          <td><span className="tag">{d.source_language} &rarr; {d.target_language}</span></td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{d.segment_count} segs ({d.word_count} w)</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{(d.payload_size / 1024).toFixed(1)} KB</td>
-                          <td style={{ fontFamily: 'var(--font-mono)' }}>{new Date(d.received_at).toLocaleTimeString()}</td>
+                          <td className="td-id">REC-{d.id}</td>
+                          <td className="text-center" style={{ fontFamily: 'var(--font-mono)' }}>JOB-{d.job_id}</td>
+                          <td className="td-job-name" title={d.source_filename}>{d.source_filename}</td>
+                          <td className="text-center"><span className="tag tag-pair">{d.source_language} &rarr; {d.target_language}</span></td>
+                          <td className="text-center" style={{ fontFamily: 'var(--font-mono)' }}>{d.segment_count} segs ({d.word_count} w)</td>
+                          <td className="text-center" style={{ fontFamily: 'var(--font-mono)' }}>{(d.payload_size / 1024).toFixed(1)} KB</td>
+                          <td className="text-center" style={{ fontFamily: 'var(--font-mono)' }}>{new Date(d.received_at).toLocaleTimeString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -630,7 +632,7 @@ export default function App() {
       <footer>
         <div className="footer-inner">
           <div className="footer-mono">
-            FOX MLO &bull; DESIGN.MD SWISS SPECIFICATION &bull; JOSEF MÜLLER-BROCKMANN GRID
+            FOX MLO &bull; ENTERPRISE LOCALIZATION PIPELINE
           </div>
           <div className="footer-mono">
             FASTAPI // UV // REACT // POSTGRES // PLUNET 10.26.2

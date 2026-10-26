@@ -250,19 +250,23 @@ body {
 
 .main-content {
   flex: 1;
-  max-width: 1320px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
-  padding: 2.5rem 2rem;
+  padding: 2rem 1.5rem;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 @media (min-width: 1080px) {
   .main-content {
-    grid-template-columns: 420px 1fr;
+    grid-template-columns: 360px minmax(0, 1fr);
   }
+}
+
+.main-content > * {
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -457,6 +461,8 @@ body {
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--border-hairline);
+  background-color: var(--surface-card);
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -464,6 +470,7 @@ table {
   border-collapse: collapse;
   font-size: 0.8125rem;
   text-align: left;
+  white-space: nowrap;
 }
 
 th {
@@ -477,6 +484,7 @@ th {
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-hairline);
   border-right: 1px solid var(--border-hairline);
+  white-space: nowrap;
 }
 
 th:last-child {
@@ -489,6 +497,7 @@ td {
   border-right: 1px solid var(--border-hairline);
   color: var(--text-primary);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 td:last-child {
@@ -499,18 +508,67 @@ tr:hover td {
   background-color: #FAF9F6;
 }
 
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.th-id, .td-id {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.th-action, .td-action {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.td-job-name {
+  font-weight: 600;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Badges */
 .tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 600;
-  padding: 0.2rem 0.45rem;
+  padding: 0.25rem 0.55rem;
   border: 1px solid var(--border-hairline);
   border-radius: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background-color: var(--surface-card);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.tag-pair {
+  background-color: var(--surface-subtle);
+  border-color: var(--border-hairline);
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.tag-plunet {
+  border-color: var(--accent-border);
+  color: var(--accent-hover);
+  background-color: var(--accent-tint);
+  font-weight: 700;
 }
 
 .tag-success {
