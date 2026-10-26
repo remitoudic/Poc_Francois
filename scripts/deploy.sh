@@ -25,14 +25,9 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1091
-source .env
-set +a
-
 missing_vars=()
 for var in "${REQUIRED_VARS[@]}"; do
-  if [ -z "${!var:-}" ]; then
+  if ! grep -E -q "^${var}=" .env; then
     missing_vars+=("$var")
   fi
 done
