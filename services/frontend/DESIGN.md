@@ -11,8 +11,12 @@ colors:
   neutral: "#737373"          # Neutral mid-grey for secondary labels and muted metadata
   border: "#E5E5E5"           # Hairline border stroke
   border-dark: "#0A0A0A"      # High-contrast structural divider
-  accent: "#E11D48"           # Swiss Vermilion Red for active focal indicators & alerts
+  accent: "#4BA0C3"           # Plunet Cyan-Blue (plunet.com brand identity)
+  accent-hover: "#1E7C9F"     # Plunet Dark Blue / Active Hover
+  accent-light: "#58BCE5"     # Plunet Light Blue
+  accent-tint: "#EBF6FA"      # Plunet Ice-Blue subtle background tint
   success: "#15803D"          # Deep Swiss Forest Green for verified operational states
+  danger: "#DC2626"           # System Error / Alert Red
 
 typography:
   display:
@@ -68,8 +72,11 @@ For **FOX MLO**, this design language transforms an ETL translation engine into 
 | `text-muted` | `#737373` | Technical descriptions, labels, timestamps |
 | `border-hairline` | `#E5E5E5` | Structural cell dividers and panel perimeters |
 | `border-contrast` | `#0A0A0A` | Active focus rings and bold demarcation lines |
-| `accent-swiss` | `#E11D48` | Precision focal indicator, active pipeline steps |
+| `accent-plunet` | `#4BA0C3` | Plunet Cyan-Blue brand accent (plunet.com) |
+| `accent-hover` | `#1E7C9F` | Plunet Dark Blue for hover and pressed states |
+| `accent-tint` | `#EBF6FA` | Plunet Ice-Blue background tint for tags and cards |
 | `success-swiss` | `#15803D` | Verified Plunet SOAP session & database health |
+| `danger-swiss` | `#DC2626` | System error & critical warning indicators |
 
 ---
 

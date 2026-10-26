@@ -12,10 +12,25 @@
   --text-muted: #737373;
   --border-hairline: #E5E5E5;
   --border-strong: #0A0A0A;
-  --accent-swiss: #E11D48;
-  --accent-hover: #BE123C;
+
+  /* Plunet Brand Palette (https://www.plunet.com) */
+  --accent-plunet: #4BA0C3;
+  --accent-hover: #1E7C9F;
+  --accent-light: #58BCE5;
+  --accent-tint: #EBF6FA;
+  --accent-border: #B8DFEE;
+  --accent-navy: #193440;
+
+  /* Swiss Style Accent Mapping */
+  --accent-swiss: var(--accent-plunet);
+
+  /* Functional Indicators */
   --success-swiss: #15803D;
   --warning-swiss: #B45309;
+  --danger-swiss: #DC2626;
+  --danger-tint: #FEF2F2;
+  --danger-border: #FECACA;
+
   --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Arial, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Consolas, Menlo, Monaco, monospace;
 }
@@ -64,7 +79,7 @@ body {
 }
 
 .brand-badge {
-  background-color: var(--border-strong);
+  background-color: var(--accent-plunet);
   color: #FFFFFF;
   font-family: var(--font-mono);
   font-size: 0.8125rem;
@@ -371,8 +386,8 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #262626;
-  border-color: #262626;
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn-primary:disabled {
@@ -430,8 +445,8 @@ body {
 }
 
 .tab-btn.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--border-strong);
+  color: var(--accent-navy);
+  border-bottom-color: var(--accent-plunet);
 }
 
 /* ==========================================================================
@@ -511,9 +526,15 @@ tr:hover td {
 }
 
 .tag-accent {
-  border-color: #FECDD3;
-  color: var(--accent-swiss);
-  background-color: #FFF1F2;
+  border-color: var(--accent-border);
+  color: var(--accent-hover);
+  background-color: var(--accent-tint);
+}
+
+.tag-danger {
+  border-color: var(--danger-border);
+  color: var(--danger-swiss);
+  background-color: var(--danger-tint);
 }
 
 /* ==========================================================================
@@ -565,12 +586,12 @@ tr:hover td {
 
 /* Alert Box */
 .alert-box {
-  background-color: #FFF1F2;
-  border: 1px solid #FECDD3;
-  border-left: 3px solid var(--accent-swiss);
+  background-color: var(--danger-tint);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger-swiss);
   padding: 0.75rem 1rem;
   font-size: 0.8125rem;
-  color: #9F1239;
+  color: #991B1B;
   margin-bottom: 1.25rem;
   display: flex;
   align-items: center;

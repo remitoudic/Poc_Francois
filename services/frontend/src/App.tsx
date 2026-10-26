@@ -266,7 +266,7 @@ export default function App() {
           <div className="card">
             <div className="card-header">
               <span className="card-title">Execution Controls</span>
-              <FileCode size={16} color="var(--accent-swiss)" />
+              <FileCode size={16} color="var(--accent-plunet)" />
             </div>
 
             <form onSubmit={handleRunETL}>
@@ -398,7 +398,7 @@ export default function App() {
               </button>
 
               {plunetAuthTest && (
-                <div style={{ marginTop: '0.875rem', padding: '0.75rem', border: '1px solid var(--border-hairline)', background: plunetAuthTest.success ? '#F0FDF4' : '#FFF1F2' }}>
+                <div style={{ marginTop: '0.875rem', padding: '0.75rem', border: '1px solid var(--border-hairline)', background: plunetAuthTest.success ? '#F0FDF4' : 'var(--danger-tint)' }}>
                   {plunetAuthTest.success ? (
                     <div>
                       <div style={{ color: 'var(--success-swiss)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
@@ -409,7 +409,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ color: 'var(--accent-swiss)', fontSize: '0.75rem' }}>
+                    <div style={{ color: 'var(--danger-swiss)', fontSize: '0.75rem' }}>
                       REFUSED: {plunetAuthTest.error || plunetAuthTest.message}
                     </div>
                   )}
@@ -555,7 +555,7 @@ export default function App() {
               <div className="metric-grid">
                 <div className="metric-cell">
                   <div className="metric-label">PLUNET ORDER</div>
-                  <div className="metric-value" style={{ color: 'var(--accent-swiss)' }}>
+                  <div className="metric-value" style={{ color: 'var(--accent-plunet)' }}>
                     {selectedJob.plunet_order_id ? `#${selectedJob.plunet_order_id}` : 'N/A'}
                   </div>
                 </div>
