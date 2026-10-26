@@ -28,6 +28,9 @@ class ETLRunRequest(BaseModel):
     destination_url: str | None = Field(
         None, description="Destination server to push processed XLIFF to"
     )
+    workflow_type: str | None = Field(
+        "type 1", description="Workflow type preset (type 1, type 2, type 3)"
+    )
     sync_with_plunet: bool = Field(
         True, description="Whether to register/sync with Plunet BusinessManager"
     )

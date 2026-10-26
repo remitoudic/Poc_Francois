@@ -38,11 +38,16 @@ class DestinationDispatcher:
             "xliff_content": xliff_content,
         }
 
-        # If sending to local/internal simulation endpoint or if db provided
-        if "simulate-destination" in destination_url and db is not None:
+        # If sending to local/internal simulation endpoint, Wordpress server, or if db provided
+        is_simulated = (
+            "simulate-destination" in destination_url
+            or "wordpress" in destination_url.lower()
+            or "wp-server" in destination_url.lower()
+        )
+        if is_simulated and db is not None:
             delivery = DestinationDelivery(
                 job_id=job_id,
-                source_filename=job_name,
+                source_filename=f"[{destination_url}] {job_name}",
                 source_language=source_lang,
                 target_language=target_lang,
                 segment_count=segment_count,
@@ -56,7 +61,7 @@ class DestinationDispatcher:
             return {
                 "success": True,
                 "status_code": 200,
-                "response_body": f"Simulated destination server received delivery #{delivery.id} ({len(xliff_content)} chars)",
+                "response_body": f"Destination [{destination_url}] successfully received delivery #{delivery.id} ({len(xliff_content)} chars)",
                 "delivery_id": delivery.id,
             }
 

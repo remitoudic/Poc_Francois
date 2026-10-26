@@ -84,7 +84,8 @@ export default function App() {
   const [sourceType, setSourceType] = useState<'fixture' | 'api'>('fixture');
   const [selectedFixture, setSelectedFixture] = useState('example.fr.xlf');
   const [apiUrl, setApiUrl] = useState('');
-  const [destinationUrl, setDestinationUrl] = useState('http://backend:8000/api/v1/etl/simulate-destination');
+  const [workflowType, setWorkflowType] = useState('type 1');
+  const [destinationUrl, setDestinationUrl] = useState('Wordpress Server 1');
   const [syncPlunet, setSyncPlunet] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -131,6 +132,7 @@ export default function App() {
     const payload: any = {
       source_type: sourceType,
       destination_url: destinationUrl,
+      workflow_type: workflowType,
       sync_with_plunet: syncPlunet,
     };
 
@@ -242,12 +244,12 @@ export default function App() {
             </div>
             <div className="pipeline-step-item">
               <span className="step-num">PHASE 02</span>
-              <span className="step-name">TRANSFORM</span>
+              <span className="step-name">VALIDATE</span>
               <span className="step-desc">Parse segments &amp; validate tags</span>
             </div>
             <div className="pipeline-step-item">
               <span className="step-num">PHASE 03</span>
-              <span className="step-name">SYNCHRONIZE</span>
+              <span className="step-name">PROCESS</span>
               <span className="step-desc">Plunet SOAP order registration</span>
             </div>
             <div className="pipeline-step-item">
@@ -287,7 +289,7 @@ export default function App() {
               {/* Source Details */}
               {sourceType === 'fixture' ? (
                 <div className="form-group">
-                  <label className="form-label">XLIFF Sample File</label>
+                  <label className="form-label">XLIFF file EXPLORER</label>
                   <select
                     className="form-select"
                     value={selectedFixture}
@@ -314,16 +316,32 @@ export default function App() {
                 </div>
               )}
 
+              {/* Workflow Type */}
+              <div className="form-group">
+                <label className="form-label">Workflow Type</label>
+                <select
+                  className="form-select"
+                  value={workflowType}
+                  onChange={(e) => setWorkflowType(e.target.value)}
+                >
+                  <option value="type 1">Type 1</option>
+                  <option value="type 2">Type 2</option>
+                  <option value="type 3">Type 3</option>
+                </select>
+                <span className="form-help">WORKFLOW PRESET CONFIGURATION</span>
+              </div>
+
               {/* Destination URL */}
               <div className="form-group">
                 <label className="form-label">Destination Server Endpoint</label>
-                <input
-                  type="text"
-                  className="form-input"
+                <select
+                  className="form-select"
                   value={destinationUrl}
                   onChange={(e) => setDestinationUrl(e.target.value)}
-                  required
-                />
+                >
+                  <option value="Wordpress Server 1">Wordpress Server 1</option>
+                  <option value="Wordpress Server 2">Wordpress Server 2</option>
+                </select>
                 <span className="form-help">TARGET SERVER RECEIVING TRANSFORMED PAYLOAD</span>
               </div>
 
