@@ -11,9 +11,9 @@ import {
   ArrowLeft,
   Copy,
   Download,
-  CheckCircle2,
   Search,
-  Check
+  Check,
+  Link2
 } from 'lucide-react';
 
 interface SystemHealth {
@@ -85,9 +85,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'jobs' | 'deliveries'>('jobs');
   const [selectedJob, setSelectedJob] = useState<ETLJob | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'detail'>('dashboard');
-  const [detailTab, setDetailTab] = useState<'segments' | 'audit' | 'processed_xml' | 'raw_xml'>('segments');
+  const [mainTab, setMainTab] = useState<'translations' | 'technical'>('translations');
+  const [techSubTab, setTechSubTab] = useState<'processed' | 'raw' | 'audit' | 'json'>('processed');
   const [segmentSearch, setSegmentSearch] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Form inputs
   const [sourceType, setSourceType] = useState<'fixture' | 'api'>('fixture');
@@ -100,6 +102,26 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [plunetAuthTest, setPlunetAuthTest] = useState<any>(null);
   const [testingPlunet, setTestingPlunet] = useState(false);
+
+  // Load and sync URL route (Base URL / :job_id / :plunet_order_id)
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      const path = window.location.pathname;
+      const match = path.match(/^\/(\d+)(?:\/([^/]+))?/);
+      if (match) {
+        const jobId = parseInt(match[1], 10);
+        const plunetOrderId = match[2] && match[2] !== '0' ? match[2] : undefined;
+        loadJobDetail(jobId, plunetOrderId, false);
+      } else {
+        setViewMode('dashboard');
+        setSelectedJob(null);
+      }
+    };
+
+    handleUrlRoute();
+    window.addEventListener('popstate', handleUrlRoute);
+    return () => window.removeEventListener('popstate', handleUrlRoute);
+  }, []);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -131,6 +153,45 @@ export default function App() {
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // View / Open Job Detail Page with /:job_id/:plunet_order URL
+  const loadJobDetail = async (jobId: number, plunetOrderId?: string | number, pushState: boolean = true) => {
+    try {
+      const res = await fetch(`/api/v1/etl/jobs/${jobId}`);
+      if (res.ok) {
+        const jobData = await res.json();
+        setSelectedJob(jobData);
+        setViewMode('detail');
+        setMainTab('translations');
+        setTechSubTab('processed');
+        setSegmentSearch('');
+        if (pushState) {
+          const orderSlug = jobData.plunet_order_id ?? plunetOrderId ?? '0';
+          window.history.pushState(null, '', `/${jobId}/${orderSlug}`);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (err) {
+      console.error('Failed to load job details:', err);
+    }
+  };
+
+  const handleBackToDashboard = (pushState: boolean = true) => {
+    setViewMode('dashboard');
+    setSelectedJob(null);
+    if (pushState) {
+      window.history.pushState(null, '', '/');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCopyUrl = (jobId: number, plunetOrderId?: number) => {
+    const orderSlug = plunetOrderId ?? 0;
+    const fullUrl = `${window.location.origin}/${jobId}/${orderSlug}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   // Run ETL Pipeline
   const handleRunETL = async (e: React.FormEvent) => {
@@ -168,8 +229,11 @@ export default function App() {
       const completedJob = await res.json();
       setSelectedJob(completedJob);
       setViewMode('detail');
-      setDetailTab('segments');
+      setMainTab('translations');
+      setTechSubTab('processed');
       setSegmentSearch('');
+      const orderSlug = completedJob.plunet_order_id ?? 0;
+      window.history.pushState(null, '', `/${completedJob.id}/${orderSlug}`);
       fetchData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
@@ -189,22 +253,6 @@ export default function App() {
       setPlunetAuthTest({ success: false, error: err.message });
     } finally {
       setTestingPlunet(false);
-    }
-  };
-
-  // View / Open Job Detail Page
-  const handleOpenJob = async (jobId: number) => {
-    try {
-      const res = await fetch(`/api/v1/etl/jobs/${jobId}`);
-      if (res.ok) {
-        setSelectedJob(await res.json());
-        setViewMode('detail');
-        setDetailTab('segments');
-        setSegmentSearch('');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    } catch (err) {
-      console.error('Failed to load job details:', err);
     }
   };
 
@@ -239,7 +287,7 @@ export default function App() {
     <div className="app-container">
       {/* Swiss Navigation Bar */}
       <header className="navbar">
-        <div className="brand" style={{ cursor: 'pointer' }} onClick={() => setViewMode('dashboard')} title="Back to Dashboard">
+        <div className="brand" style={{ cursor: 'pointer' }} onClick={() => handleBackToDashboard(true)} title="Back to Dashboard">
           <div className="brand-badge">FOX</div>
           <div>
             <div className="brand-title">FOX MLO</div>
@@ -269,12 +317,25 @@ export default function App() {
       {/* Main View: Job Detail View or Pipeline Dashboard */}
       {viewMode === 'detail' && selectedJob ? (
         <div className="detail-view">
-          {/* Breadcrumb & Navigation Bar */}
+          {/* Top Bar: Navigation + Shareable URL Pill + Actions */}
           <div className="detail-top-nav">
-            <button className="back-btn" onClick={() => setViewMode('dashboard')}>
+            <button className="back-btn" onClick={() => handleBackToDashboard(true)}>
               <ArrowLeft size={14} />
-              <span>&larr; BACK TO JOBS OVERVIEW</span>
+              <span>&larr; BACK TO JOBS</span>
             </button>
+
+            {/* Shareable Direct URL Pill: Base URL / :job_id / :plunet_order_id */}
+            <div
+              className="job-url-pill"
+              onClick={() => handleCopyUrl(selectedJob.id, selectedJob.plunet_order_id)}
+              title="Click to copy shareable direct URL"
+            >
+              <Link2 size={13} color="var(--accent-plunet)" />
+              <span style={{ color: 'var(--text-muted)' }}>URL:</span>
+              <span className="url-text">/{selectedJob.id}/{selectedJob.plunet_order_id || 0}</span>
+              <span className="copy-tag">{copiedUrl ? 'COPIED!' : 'COPY LINK'}</span>
+            </div>
+
             <div className="detail-actions">
               {selectedJob.plunet_order_id && (
                 <a
@@ -286,7 +347,7 @@ export default function App() {
                   title="Open Plunet BusinessManager Portal"
                 >
                   <ExternalLink size={12} />
-                  <span>PLUNET PORTAL (ORDER #{selectedJob.plunet_order_id})</span>
+                  <span>PLUNET PORTAL</span>
                 </a>
               )}
               {selectedJob.processed_xliff && (
@@ -297,14 +358,14 @@ export default function App() {
                   onClick={() => handleDownloadXliff(selectedJob.processed_xliff!, `${selectedJob.job_name}.xlf`)}
                 >
                   <Download size={12} />
-                  <span>DOWNLOAD XLIFF (.XLF)</span>
+                  <span>DOWNLOAD .XLF</span>
                 </button>
               )}
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{ width: 'auto' }}
-                onClick={() => handleOpenJob(selectedJob.id)}
+                onClick={() => loadJobDetail(selectedJob.id, selectedJob.plunet_order_id, false)}
                 title="Reload latest job state"
               >
                 <RotateCw size={12} />
@@ -313,12 +374,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Job Overview Card */}
+          {/* Clean Hero Header Card */}
           <div className="detail-header-card">
             <div className="detail-meta-row">
               <div>
                 <div className="detail-sub">
-                  JOB #{selectedJob.id} &bull; {selectedJob.source_type.toUpperCase()} ORIGIN &bull; {new Date(selectedJob.created_at).toLocaleString()}
+                  JOB #{selectedJob.id} &bull; {selectedJob.source_type.toUpperCase()} INGESTION &bull; {new Date(selectedJob.created_at).toLocaleString()}
                 </div>
                 <h2 className="detail-title">{selectedJob.job_name}</h2>
               </div>
@@ -339,129 +400,107 @@ export default function App() {
               </div>
             </div>
 
-            {/* 4-Phase Pipeline Status Stepper for this Job */}
-            <div className="detail-pipeline">
-              <div className="detail-pipeline-step completed">
-                <div className="detail-step-header">
-                  <span className="detail-step-tag">PHASE 01 // EXTRACT</span>
-                  <CheckCircle2 size={14} color="var(--success-swiss)" />
+            {/* Streamlined Minimalist Stepper */}
+            <div className="detail-progress-strip">
+              <div className="detail-progress-box done">
+                <span className="detail-progress-step-num">01</span>
+                <div className="detail-progress-text">
+                  <span className="detail-progress-title">EXTRACT</span>
+                  <span className="detail-progress-desc">{selectedJob.source_reference || selectedJob.job_name}</span>
                 </div>
-                <span className="detail-step-name">{selectedJob.source_type.toUpperCase()} INGESTION</span>
-                <span className="detail-step-detail">{selectedJob.source_reference || selectedJob.job_name}</span>
               </div>
 
-              <div className="detail-pipeline-step completed">
-                <div className="detail-step-header">
-                  <span className="detail-step-tag">PHASE 02 // VALIDATE</span>
-                  <CheckCircle2 size={14} color="var(--success-swiss)" />
+              <div className="detail-progress-box done">
+                <span className="detail-progress-step-num">02</span>
+                <div className="detail-progress-text">
+                  <span className="detail-progress-title">VALIDATE</span>
+                  <span className="detail-progress-desc">{selectedJob.segment_count} segs ({selectedJob.word_count} words)</span>
                 </div>
-                <span className="detail-step-name">XLIFF INTEGRITY</span>
-                <span className="detail-step-detail">{selectedJob.segment_count} segments ({selectedJob.word_count} words)</span>
               </div>
 
-              <div className="detail-pipeline-step completed">
-                <div className="detail-step-header">
-                  <span className="detail-step-tag">PHASE 03 // PROCESS</span>
-                  <CheckCircle2 size={14} color="var(--accent-plunet)" />
+              <div className="detail-progress-box done">
+                <span className="detail-progress-step-num">03</span>
+                <div className="detail-progress-text">
+                  <span className="detail-progress-title">PROCESS</span>
+                  <span className="detail-progress-desc">
+                    {selectedJob.plunet_order_id ? `Order #${selectedJob.plunet_order_id}` : selectedJob.plunet_synced}
+                  </span>
                 </div>
-                <span className="detail-step-name">PLUNET SOAP 1.2</span>
-                <span className="detail-step-detail">
-                  {selectedJob.plunet_order_id ? `Order #${selectedJob.plunet_order_id} Synced` : selectedJob.plunet_synced}
-                </span>
               </div>
 
-              <div className="detail-pipeline-step completed">
-                <div className="detail-step-header">
-                  <span className="detail-step-tag">PHASE 04 // DELIVER</span>
-                  <CheckCircle2 size={14} color="var(--success-swiss)" />
+              <div className="detail-progress-box done">
+                <span className="detail-progress-step-num">04</span>
+                <div className="detail-progress-text">
+                  <span className="detail-progress-title">DELIVER</span>
+                  <span className="detail-progress-desc">
+                    {selectedJob.destination_url || 'Wordpress Server 1'} (HTTP {selectedJob.destination_status_code || 200})
+                  </span>
                 </div>
-                <span className="detail-step-name">DISPATCH DESTINATION</span>
-                <span className="detail-step-detail">
-                  {selectedJob.destination_url || 'Wordpress Server 1'} (HTTP {selectedJob.destination_status_code || 200})
-                </span>
               </div>
             </div>
           </div>
 
-          {/* Swiss Metric Grid */}
-          <div className="metric-grid">
-            <div className="metric-cell">
-              <div className="metric-label">PLUNET ORDER ID</div>
-              <div className="metric-value" style={{ color: 'var(--accent-plunet)' }}>
+          {/* 4 Compact KPIs */}
+          <div className="detail-kpi-grid">
+            <div className="detail-kpi-card">
+              <div className="detail-kpi-label">PLUNET ORDER</div>
+              <div className="detail-kpi-val" style={{ color: 'var(--accent-plunet)' }}>
                 {selectedJob.plunet_order_id ? `#${selectedJob.plunet_order_id}` : 'N/A'}
               </div>
+              <div className="detail-kpi-sub">SOAP 1.2 Connected</div>
             </div>
 
-            <div className="metric-cell">
-              <div className="metric-label">DESTINATION SERVER</div>
-              <div className="metric-value" style={{ fontSize: '0.95rem' }}>
+            <div className="detail-kpi-card">
+              <div className="detail-kpi-label">VOLUME METRICS</div>
+              <div className="detail-kpi-val">{selectedJob.word_count} Words</div>
+              <div className="detail-kpi-sub">{selectedJob.segment_count} translation units</div>
+            </div>
+
+            <div className="detail-kpi-card">
+              <div className="detail-kpi-label">DESTINATION SERVER</div>
+              <div className="detail-kpi-val" style={{ fontSize: '1.05rem' }}>
                 {selectedJob.destination_url || 'Wordpress Server 1'}
               </div>
-            </div>
-
-            <div className="metric-cell">
-              <div className="metric-label">TOTAL WORDS</div>
-              <div className="metric-value">{selectedJob.word_count}</div>
-            </div>
-
-            <div className="metric-cell">
-              <div className="metric-label">TOTAL SEGMENTS</div>
-              <div className="metric-value">{selectedJob.segment_count}</div>
-            </div>
-
-            <div className="metric-cell">
-              <div className="metric-label">DESTINATION HTTP</div>
-              <div className="metric-value" style={{ color: 'var(--success-swiss)' }}>
-                HTTP {selectedJob.destination_status_code || 200}
+              <div className="detail-kpi-sub" style={{ color: 'var(--success-swiss)' }}>
+                HTTP {selectedJob.destination_status_code || 200} Dispatched
               </div>
             </div>
 
-            <div className="metric-cell">
-              <div className="metric-label">PAYLOAD SIZE</div>
-              <div className="metric-value">
+            <div className="detail-kpi-card">
+              <div className="detail-kpi-label">PAYLOAD SIZE</div>
+              <div className="detail-kpi-val">
                 {((selectedJob.processed_xliff?.length || 0) / 1024).toFixed(1)} KB
               </div>
+              <div className="detail-kpi-sub">XLIFF 1.2 XML Document</div>
             </div>
           </div>
 
-          {/* Detailed Content Tabs */}
+          {/* Main Content Card: Clean 2-Tab Navigation */}
           <div className="card">
-            <div className="tabs-container">
+            <div className="detail-main-tab-bar">
               <button
-                className={`tab-btn ${detailTab === 'segments' ? 'active' : ''}`}
-                onClick={() => setDetailTab('segments')}
+                className={`detail-main-tab-btn ${mainTab === 'translations' ? 'active' : ''}`}
+                onClick={() => setMainTab('translations')}
               >
-                BILINGUAL SEGMENTS ({selectedJob.segments?.length || 0})
+                BILINGUAL TRANSLATIONS ({selectedJob.segments?.length || 0})
               </button>
               <button
-                className={`tab-btn ${detailTab === 'audit' ? 'active' : ''}`}
-                onClick={() => setDetailTab('audit')}
+                className={`detail-main-tab-btn ${mainTab === 'technical' ? 'active' : ''}`}
+                onClick={() => setMainTab('technical')}
               >
-                AUDIT &amp; SYSTEM LOGS
-              </button>
-              <button
-                className={`tab-btn ${detailTab === 'processed_xml' ? 'active' : ''}`}
-                onClick={() => setDetailTab('processed_xml')}
-              >
-                PROCESSED XLIFF (XML)
-              </button>
-              <button
-                className={`tab-btn ${detailTab === 'raw_xml' ? 'active' : ''}`}
-                onClick={() => setDetailTab('raw_xml')}
-              >
-                RAW SOURCE XLIFF
+                TECHNICAL DETAILS &amp; XML
               </button>
             </div>
 
-            {/* Sub-tab 1: Bilingual Segments Table */}
-            {detailTab === 'segments' && (
+            {/* TAB 1: Bilingual Segments */}
+            {mainTab === 'translations' && (
               <div>
                 <div className="search-bar">
                   <Search size={15} color="var(--text-muted)" />
                   <input
                     type="text"
                     className="search-input"
-                    placeholder="Search translated segments by text, unit ID, or key..."
+                    placeholder="Search translated segments by source text, translation, or unit ID..."
                     value={segmentSearch}
                     onChange={(e) => setSegmentSearch(e.target.value)}
                   />
@@ -480,14 +519,14 @@ export default function App() {
                     <thead>
                       <tr>
                         <th style={{ width: '1%', textAlign: 'center' }}>#</th>
-                        <th style={{ width: '15%' }}>RESOURCE / KEY</th>
-                        <th style={{ width: '40%' }}>
+                        <th style={{ width: '14%' }}>RESOURCE / KEY</th>
+                        <th style={{ width: '42%' }}>
                           SOURCE [{selectedJob.source_language.toUpperCase()}]
                         </th>
-                        <th style={{ width: '40%' }}>
+                        <th style={{ width: '42%' }}>
                           TARGET [{selectedJob.target_language.toUpperCase()}]
                         </th>
-                        <th style={{ width: '4%', textAlign: 'center' }}>STATUS</th>
+                        <th style={{ width: '1%', textAlign: 'center' }}>STATUS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -526,103 +565,134 @@ export default function App() {
               </div>
             )}
 
-            {/* Sub-tab 2: Audit Logs */}
-            {detailTab === 'audit' && (
+            {/* TAB 2: Technical & XML */}
+            {mainTab === 'technical' && (
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                  <div style={{ border: '1px solid var(--border-hairline)', padding: '1.25rem' }}>
-                    <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Server size={15} color="var(--accent-plunet)" />
-                      <span>Plunet BusinessManager Audit</span>
-                    </div>
-                    <div style={{ fontSize: '0.8125rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div><span style={{ color: 'var(--text-muted)' }}>SOAP Endpoint: </span><span style={{ fontFamily: 'var(--font-mono)' }}>https://portal.foxtranslations.com/</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Plunet Version: </span><span style={{ fontFamily: 'var(--font-mono)' }}>10.26.2</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Order ID: </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-plunet)' }}>#{selectedJob.plunet_order_id || 'N/A'}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Sync Status: </span><span className="tag tag-success">{selectedJob.plunet_synced}</span></div>
-                    </div>
-                  </div>
-
-                  <div style={{ border: '1px solid var(--border-hairline)', padding: '1.25rem' }}>
-                    <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Database size={15} color="var(--success-swiss)" />
-                      <span>Destination Dispatch Audit</span>
-                    </div>
-                    <div style={{ fontSize: '0.8125rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Target Server: </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selectedJob.destination_url || 'Wordpress Server 1'}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>HTTP Status: </span><span className="tag tag-success">HTTP {selectedJob.destination_status_code || 200}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Source Reference: </span><span style={{ fontFamily: 'var(--font-mono)' }}>{selectedJob.source_reference || selectedJob.job_name}</span></div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Execution Timestamp: </span><span style={{ fontFamily: 'var(--font-mono)' }}>{new Date(selectedJob.created_at).toISOString()}</span></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                    RAW JOB JSON SPECIFICATION
-                  </span>
+                <div className="tabs-container" style={{ marginBottom: '1.25rem' }}>
                   <button
-                    className="btn btn-outline btn-sm"
-                    onClick={() => handleCopy(JSON.stringify(selectedJob, null, 2))}
+                    className={`tab-btn ${techSubTab === 'processed' ? 'active' : ''}`}
+                    onClick={() => setTechSubTab('processed')}
                   >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copied ? 'COPIED!' : 'COPY JSON'}</span>
+                    PROCESSED XLIFF (XML)
+                  </button>
+                  <button
+                    className={`tab-btn ${techSubTab === 'raw' ? 'active' : ''}`}
+                    onClick={() => setTechSubTab('raw')}
+                  >
+                    RAW SOURCE XLIFF
+                  </button>
+                  <button
+                    className={`tab-btn ${techSubTab === 'audit' ? 'active' : ''}`}
+                    onClick={() => setTechSubTab('audit')}
+                  >
+                    AUDIT LOGS
+                  </button>
+                  <button
+                    className={`tab-btn ${techSubTab === 'json' ? 'active' : ''}`}
+                    onClick={() => setTechSubTab('json')}
+                  >
+                    RAW JSON SPEC
                   </button>
                 </div>
-                <pre className="xml-box" style={{ maxHeight: '320px' }}>
-                  {JSON.stringify(selectedJob, null, 2)}
-                </pre>
-              </div>
-            )}
 
-            {/* Sub-tab 3: Processed XML */}
-            {detailTab === 'processed_xml' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                    DISPATCHED XLIFF 1.2 DOCUMENT
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => handleCopy(selectedJob.processed_xliff || '')}
-                    >
-                      {copied ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copied ? 'COPIED!' : 'COPY XML'}</span>
-                    </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleDownloadXliff(selectedJob.processed_xliff || '', `${selectedJob.job_name}.xlf`)}
-                    >
-                      <Download size={12} />
-                      <span>DOWNLOAD .XLF</span>
-                    </button>
+                {techSubTab === 'processed' && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                        DISPATCHED XLIFF 1.2 PAYLOAD
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => handleCopy(selectedJob.processed_xliff || '')}
+                        >
+                          {copied ? <Check size={12} /> : <Copy size={12} />}
+                          <span>{copied ? 'COPIED!' : 'COPY XML'}</span>
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleDownloadXliff(selectedJob.processed_xliff || '', `${selectedJob.job_name}.xlf`)}
+                        >
+                          <Download size={12} />
+                          <span>DOWNLOAD .XLF</span>
+                        </button>
+                      </div>
+                    </div>
+                    <pre className="xml-box" style={{ maxHeight: '440px' }}>
+                      {selectedJob.processed_xliff || 'No processed XLIFF payload available.'}
+                    </pre>
                   </div>
-                </div>
-                <pre className="xml-box" style={{ maxHeight: '480px' }}>
-                  {selectedJob.processed_xliff || 'No processed XLIFF payload available.'}
-                </pre>
-              </div>
-            )}
+                )}
 
-            {/* Sub-tab 4: Raw XML */}
-            {detailTab === 'raw_xml' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                    ORIGINAL INGESTED XLIFF
-                  </span>
-                  <button
-                    className="btn btn-outline btn-sm"
-                    onClick={() => handleCopy(selectedJob.raw_xliff || '')}
-                  >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copied ? 'COPIED!' : 'COPY RAW XML'}</span>
-                  </button>
-                </div>
-                <pre className="xml-box" style={{ maxHeight: '480px' }}>
-                  {selectedJob.raw_xliff || 'No raw XLIFF payload stored.'}
-                </pre>
+                {techSubTab === 'raw' && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                        ORIGINAL SOURCE XLIFF
+                      </span>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleCopy(selectedJob.raw_xliff || '')}
+                      >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{copied ? 'COPIED!' : 'COPY RAW XML'}</span>
+                      </button>
+                    </div>
+                    <pre className="xml-box" style={{ maxHeight: '440px' }}>
+                      {selectedJob.raw_xliff || 'No raw XLIFF payload stored.'}
+                    </pre>
+                  </div>
+                )}
+
+                {techSubTab === 'audit' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                    <div style={{ border: '1px solid var(--border-hairline)', padding: '1.25rem' }}>
+                      <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Server size={15} color="var(--accent-plunet)" />
+                        <span>Plunet BusinessManager Audit</span>
+                      </div>
+                      <div style={{ fontSize: '0.8125rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div><span style={{ color: 'var(--text-muted)' }}>SOAP Endpoint: </span><span style={{ fontFamily: 'var(--font-mono)' }}>https://portal.foxtranslations.com/</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Plunet Version: </span><span style={{ fontFamily: 'var(--font-mono)' }}>10.26.2</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Order ID: </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-plunet)' }}>#{selectedJob.plunet_order_id || 'N/A'}</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Sync Status: </span><span className="tag tag-success">{selectedJob.plunet_synced}</span></div>
+                      </div>
+                    </div>
+
+                    <div style={{ border: '1px solid var(--border-hairline)', padding: '1.25rem' }}>
+                      <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Database size={15} color="var(--success-swiss)" />
+                        <span>Destination Dispatch Audit</span>
+                      </div>
+                      <div style={{ fontSize: '0.8125rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Target Server: </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selectedJob.destination_url || 'Wordpress Server 1'}</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>HTTP Status: </span><span className="tag tag-success">HTTP {selectedJob.destination_status_code || 200}</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Source Reference: </span><span style={{ fontFamily: 'var(--font-mono)' }}>{selectedJob.source_reference || selectedJob.job_name}</span></div>
+                        <div><span style={{ color: 'var(--text-muted)' }}>Timestamp: </span><span style={{ fontFamily: 'var(--font-mono)' }}>{new Date(selectedJob.created_at).toISOString()}</span></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {techSubTab === 'json' && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                        RAW JOB JSON SPECIFICATION
+                      </span>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleCopy(JSON.stringify(selectedJob, null, 2))}
+                      >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{copied ? 'COPIED!' : 'COPY JSON'}</span>
+                      </button>
+                    </div>
+                    <pre className="xml-box" style={{ maxHeight: '440px' }}>
+                      {JSON.stringify(selectedJob, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -875,7 +945,7 @@ export default function App() {
                         <tr
                           key={j.id}
                           className="clickable-row"
-                          onClick={() => handleOpenJob(j.id)}
+                          onClick={() => loadJobDetail(j.id, j.plunet_order_id, true)}
                           title="Click row to open detailed job breakdown"
                         >
                           <td className="td-id">#{j.id}</td>
@@ -936,7 +1006,7 @@ export default function App() {
                         <tr
                           key={d.id}
                           className="clickable-row"
-                          onClick={() => handleOpenJob(d.job_id)}
+                          onClick={() => loadJobDetail(d.job_id, undefined, true)}
                           title="Click row to open job breakdown"
                         >
                           <td className="td-id">REC-{d.id}</td>

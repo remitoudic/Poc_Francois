@@ -713,6 +713,198 @@ footer {
   gap: 1rem;
 }
 
+/* Shareable Base URL + Job ID + Plunet Order Pill */
+.job-url-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  padding: 0.45rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+}
+
+.job-url-pill:hover {
+  border-color: var(--accent-plunet);
+  background-color: var(--accent-tint);
+}
+
+.job-url-pill .url-text {
+  font-weight: 700;
+  color: var(--accent-plunet);
+}
+
+.job-url-pill .copy-tag {
+  font-size: 0.625rem;
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border-hairline);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.job-url-pill:hover .copy-tag {
+  background-color: var(--accent-plunet);
+  color: #FFFFFF;
+  border-color: var(--accent-plunet);
+}
+
+/* Streamlined KPI Grid */
+.detail-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .detail-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .detail-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-kpi-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-kpi-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detail-kpi-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.detail-kpi-sub {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+}
+
+/* Streamlined Minimalist Stepper */
+.detail-progress-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background-color: var(--border-hairline);
+  border: 1px solid var(--border-hairline);
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .detail-progress-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-progress-box {
+  background-color: var(--surface-card);
+  padding: 0.85rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.detail-progress-box.done {
+  background-color: #FAFCFD;
+}
+
+.detail-progress-step-num {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--accent-plunet);
+  background-color: var(--accent-tint);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.detail-progress-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.detail-progress-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-progress-desc {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Primary Main Tabs */
+.detail-main-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-hairline);
+  background-color: var(--surface-subtle);
+  margin-bottom: 1.25rem;
+}
+
+.detail-main-tab-btn {
+  padding: 0.85rem 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.detail-main-tab-btn:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.detail-main-tab-btn.active {
+  color: var(--accent-plunet);
+  border-bottom-color: var(--accent-plunet);
+  background-color: var(--surface-card);
+}
+
 .back-btn {
   display: inline-flex;
   align-items: center;
