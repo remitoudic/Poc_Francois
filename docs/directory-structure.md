@@ -7,6 +7,8 @@
 ├── README.md
 ├── DESIGN.md                       # Swiss-style design system
 ├── docs/                           # Project documentation
+├── scripts/
+│   └── start_locally.sh            # Local Docker Compose startup script
 ├── fixtures/                       # Sample XLIFF test files
 │   └── XLIFF/
 │       ├── example.de-AT.xlf       # German (Austria) sample

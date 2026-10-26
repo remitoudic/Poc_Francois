@@ -30,9 +30,9 @@ POSTGRES_HOST_PORT=5433
 
 ### 2. Build & launch
 ```bash
-docker compose up -d --build
-docker compose ps
+./scripts/start_locally.sh
 ```
+*(Or manually via `docker compose up -d --build`)*
 
 ### 3. Open
 | Service | URL |
