@@ -2,13 +2,17 @@
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # CI/CD automated deployment to VPS
 ├── docker-compose.yml              # Multi-container orchestration
 ├── env.example                     # Template for environment variables
 ├── README.md
 ├── DESIGN.md                       # Swiss-style design system
 ├── docs/                           # Project documentation
 ├── scripts/
-│   └── start_locally.sh            # Local Docker Compose startup script
+│   ├── start_locally.sh            # Local Docker Compose startup script
+│   └── deploy.sh                   # VPS deployment and health check script
 ├── fixtures/                       # Sample XLIFF test files
 │   └── XLIFF/
 │       ├── example.de-AT.xlf       # German (Austria) sample
