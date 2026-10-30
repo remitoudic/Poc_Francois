@@ -29,6 +29,10 @@ def _text(rendered: str) -> str:
     return html.unescape(_TAGS.sub("", rendered or "")).strip()
 
 
+def _words(rendered: str) -> int:
+    return len(html.unescape(_TAGS.sub(" ", rendered or "")).split())  # tags separate words
+
+
 def _post(data: dict[str, Any]) -> SourcePost:
     return SourcePost(
         id=data["id"],
@@ -36,6 +40,7 @@ def _post(data: dict[str, Any]) -> SourcePost:
         title=_text(data.get("title", {}).get("rendered", "")),
         lang=data.get("lang", ""),
         link=data.get("link"),
+        words=_words(data.get("content", {}).get("rendered", "")),
         translations=data.get("translations") or {},
     )
 

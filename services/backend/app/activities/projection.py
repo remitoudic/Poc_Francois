@@ -112,7 +112,7 @@ async def load_position(position_id: int) -> PositionPlan:
             target_lang=position.target_lang,
             destination=position.destination,
             deadline=position.order.deadline,
-            tasks=[TaskSpec(task_id=t.id, seq=t.seq, type=t.type) for t in position.tasks],
+            tasks=[TaskSpec(task_id=t.id, seq=t.seq, type=t.type, attempts=t.attempts) for t in position.tasks],
         )
 
 

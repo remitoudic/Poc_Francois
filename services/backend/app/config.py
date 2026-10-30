@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     POLYLANG_USERNAME: str = ""
     POLYLANG_APP_PASSWORD: str = ""
     POLYLANG_TIMEOUT_SECONDS: float = 20.0
+    POLYLANG_SITE: str = ""  # site name shown in the UI; default: the host of POLYLANG_BASE_URL
+    REFERENCE_CACHE_SECONDS: int = 600  # Plunet customers and PMs are re-read at most this often
 
     # Realtime (Postgres LISTEN/NOTIFY)
     EVENTS_CHANNEL: str = "fox_events"

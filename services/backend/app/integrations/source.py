@@ -36,6 +36,7 @@ class SourcePost(BaseModel):
     title: str
     lang: str
     link: str | None = None
+    words: int = 0  # words in the rendered content
     translations: dict[str, int] = {}  # lang slug -> post id, as Polylang returns it
 
 

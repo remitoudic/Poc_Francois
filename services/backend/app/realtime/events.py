@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
@@ -70,3 +70,11 @@ def scoped_events_query(order_id: int | None, position_id: int | None):
     if position_id is not None:
         query = query.where(Event.position_id == position_id)
     return query
+
+
+async def page_events(session: AsyncSession, query: Select, after_id: int | None, limit: int) -> list[Event]:
+    """Oldest first. With `after_id`, the events after it; else the latest `limit` events."""
+    if after_id is not None:
+        return list((await session.scalars(query.where(Event.id > after_id).limit(limit))).all())
+    latest = (await session.scalars(query.order_by(None).order_by(Event.id.desc()).limit(limit))).all()
+    return list(reversed(latest))

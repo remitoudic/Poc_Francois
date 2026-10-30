@@ -212,6 +212,21 @@ async def test_restart_from_review_resets_later_tasks_and_creates_a_new_job(env)
     assert fakes.world.count("run_qa") == 2
 
 
+async def test_new_run_from_a_task_keeps_counting_attempts(env):
+    plan = fakes.world.add_position(11, AUTO)
+    for spec in plan.tasks:
+        spec.attempts = 1  # as stored after the first, completed run
+    async with workers(env):
+        result = await env.client.execute_workflow(
+            PositionWorkflow.run, PositionInput(position_id=11, start_from=1, plunet_queue=PLUNET_QUEUE),
+            id=f"position-11-{uuid.uuid4().hex[:6]}", task_queue=QUEUE,
+        )
+    assert result.status == WorkflowStatus.COMPLETED
+    assert ("reset_tasks", (11, 1)) in fakes.world.calls
+    assert [c.attempts for c in fakes.world.changes if c.started] == [2, 2]  # QA and DELIVER, IMPORT not re-run
+    assert any("(attempt 2)" in m for m in fakes.world.messages())
+
+
 async def test_restart_while_job_open_cancels_it_in_plunet_first(env):
     fakes.world.add_position(9, FULL)
     async with workers(env):

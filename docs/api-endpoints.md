@@ -30,6 +30,34 @@ Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/doc
 * `GET /api/v1/plunet/status`: Returns the live Plunet version from `portal.foxtranslations.com`.
 * `POST /api/v1/plunet/test-login`: Logs in with the configured credentials and returns a session UUID.
 
+## Orders (`/api/v1/orders`)
+* `GET /api/v1/orders`: `?kind&status&pm&customer&attention&q&limit&offset`, newest first.
+* `POST /api/v1/orders`: Creates an order or quote (one position per post × target language) and starts its workflow. 201 with the order; 422 on invalid input; 503 if the workflow could not start (the order is kept as `DRAFT`).
+* `GET /api/v1/orders/{id}`: Order with positions, tasks and totals.
+* `POST /api/v1/orders/{id}/accept` · `/reject` (body: `reason`, optional): Open quotes only, else 409.
+* `POST /api/v1/orders/{id}/actions`: `{action: pause | resume | retry_failed}` on every position it fits.
+
+## Positions (`/api/v1/positions`)
+* `GET /api/v1/positions/{id}`: Position with its tasks and a summary of its order.
+* `POST /api/v1/positions/{id}/actions`: `{action: pause | resume | retry | restart_from | cancel, task_seq?, reason?}`. 202 with the position; 409 when the workflow refuses (message from the workflow), 422 for a cancel without reason or a missing `task_seq`.
+* `GET /api/v1/positions/{id}/events`: `?level&kind&task_id&after_id&limit`.
+* `GET /api/v1/positions/{id}/segments`: Source, target and QA findings per unit.
+* `GET /api/v1/positions/{id}/xliff`: `?variant=raw|processed`, as a file download.
+
+## Events (`/api/v1/events`)
+* `GET /api/v1/events`: `?order_id&position_id&after_id&limit`. Without `after_id`, the latest `limit` events, oldest first.
+* `GET /api/v1/events/stream`: Server-Sent Events, `?order_id | ?position_id`, resumes from `Last-Event-ID`.
+
+## Reference data
+* `GET /api/v1/plunet/customers` · `/plunet/resources`: Active customers and project managers from Plunet (FOX MLO ids).
+* `GET /api/v1/templates`: Workflow templates and their tasks.
+* `GET /api/v1/sources/polylang/sites` · `/languages?site` · `/posts?site&lang&q`.
+
+## Analytics
+* `GET /api/v1/analytics/summary`: `?group_by=pm|customer&from&to`.
+
+All write calls take an optional `X-Fox-Actor` header (the name shown in the logs) until authentication exists.
+
 ## Dev (`/api/v1/dev`, only with `DEV_ENDPOINTS=true`)
 Temporary until the v2 API (phase 5). Never enabled in production.
 * `POST /api/v1/dev/orders`: Creates an order or quote (`kind`, `template`, `positions[]` with `post_id`, `title`, `target_lang`) and starts its `OrderWorkflow`.

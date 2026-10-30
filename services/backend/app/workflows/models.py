@@ -36,6 +36,7 @@ class TaskSpec(BaseModel):
     task_id: int
     seq: int
     type: TaskType
+    attempts: int = 0  # runs so far; a restarted position keeps counting
 
 
 class PositionPlan(BaseModel):
