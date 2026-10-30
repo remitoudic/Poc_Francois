@@ -3,7 +3,15 @@
 Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## Health & Status
-* `GET /api/v1/health`: Checks FastAPI and PostgreSQL status, and queries the Plunet server version.
+* `GET /api/v1/health`: Checks PostgreSQL, the realtime listener, Temporal, Polylang and the Plunet server version.
+* `GET /api/v1/health/live`: Liveness only (used by Docker healthchecks).
+
+## Realtime (`/api/v1/events`)
+* `GET /api/v1/events/stream`: Server-Sent Events of the events bus. Optional `order_id` or `position_id` scope. Resumes after `Last-Event-ID` (header) or `last_event_id` (query). Sends `event: resync` when the server may have missed events; the client should refetch.
+* `GET /api/v1/events`: Event history. Query: `order_id`, `position_id`, `after_id`, `limit`.
+
+## System (`/api/v1/system`)
+* `POST /api/v1/system/check-workflow`: Runs a Temporal workflow that writes one event, to check the round trip api → Temporal → worker → Postgres → SSE.
 
 ## ETL Pipeline (`/api/v1/etl`)
 * `POST /api/v1/etl/run`: Runs the full pipeline (Extract → Validate → Process → Deliver).

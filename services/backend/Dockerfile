@@ -21,7 +21,8 @@ COPY pyproject.toml uv.lock* ./
 # Install project dependencies
 RUN uv sync --frozen --no-install-project --no-dev || uv sync --no-install-project --no-dev
 
-# Copy application source code
+# Copy application source code and migrations config
+COPY alembic.ini ./
 COPY app ./app
 
 # Create fixtures placeholder directory (can be mounted via docker volume)
@@ -32,4 +33,5 @@ RUN uv sync --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# API: migrate, then serve. The worker service overrides this with `python -m app.worker`.
+CMD ["sh", "-c", "uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000"]

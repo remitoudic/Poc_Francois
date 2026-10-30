@@ -47,7 +47,10 @@ class XLIFFSegment(Base):
     __tablename__ = "xliff_segments"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("etl_jobs.id"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("etl_jobs.id"), nullable=True, index=True)
+    position_id = Column(
+        Integer, ForeignKey("positions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     unit_id = Column(String(100), nullable=False)
     resname = Column(String(255), nullable=True)
     source_text = Column(Text, nullable=False)
