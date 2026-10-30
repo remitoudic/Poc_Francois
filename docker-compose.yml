@@ -9,6 +9,9 @@ x-backend-env: &backend-env
   POLYLANG_BASE_URL: ${POLYLANG_BASE_URL:-http://polylang-mock:8090}
   POLYLANG_USERNAME: ${POLYLANG_USERNAME:-}
   POLYLANG_APP_PASSWORD: ${POLYLANG_APP_PASSWORD:-}
+  PLUNET_MODE: ${PLUNET_MODE:-soap}
+  DEV_ENDPOINTS: ${DEV_ENDPOINTS:-false}
+  PLUNET_SYNC_SECONDS: ${PLUNET_SYNC_SECONDS:-120}
 
 x-temporal-db-env: &temporal-db-env
   DB: postgres12

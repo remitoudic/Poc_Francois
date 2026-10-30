@@ -89,5 +89,9 @@ class EventType(IntEnum):
     DELIVERY_DATE_CHANGED = 5
 
 
+def job_out_folder(project_type: ProjectType) -> FolderType:
+    return FolderType.QUOTE_JOB_OUT if project_type == ProjectType.QUOTE else FolderType.ORDER_JOB_OUT
+
+
 def item_source_folder(project_type: ProjectType) -> FolderType:
     return FolderType.QUOTE_ITEM_SOURCE if project_type == ProjectType.QUOTE else FolderType.ORDER_ITEM_SOURCE

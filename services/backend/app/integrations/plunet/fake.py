@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import itertools
+import re
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.integrations.plunet.enums import ItemStatus, JobStatus, ProjectType, QuoteStatus
 from app.integrations.plunet.gateway import PlunetBusinessError
@@ -14,13 +16,14 @@ from app.integrations.plunet.models import (
     ItemDraft,
     Money,
     PlunetCustomer,
+    PlunetItem,
     PlunetJob,
     PlunetLanguage,
     PlunetResource,
     ProjectDraft,
 )
 
-JOB_TYPES = {"PM", "TRA", "REV"}
+JOB_TYPES = {"PRM", "TRA", "REV"}  # job type short names on the FOX instance (no "PM")
 
 
 @dataclass
@@ -35,6 +38,20 @@ class _Job:
     job: PlunetJob
     project_id: int
     price: float = 0.0
+    output: dict[str, bytes] = field(default_factory=dict)
+
+
+_UNIT = re.compile(rb"<source>((?:(?!</source>).)*)</source>(\s*)<target([^>]*)(?:/>|>\s*</target>)", re.S)
+
+
+def simulated_translation(xliff: bytes, target_lang: str) -> bytes:
+    """What a translator would deliver: each empty <target> filled from the <source> before it."""
+    prefix = f"[{target_lang}] ".encode()
+    return _UNIT.sub(
+        lambda m: b"<source>" + m.group(1) + b"</source>" + m.group(2)
+        + b"<target" + m.group(3) + b">" + prefix + m.group(1) + b"</target>",
+        xliff,
+    )
 
 
 class FakePlunetGateway:
@@ -53,6 +70,10 @@ class FakePlunetGateway:
             PlunetResource(id=12, name="Jonas Weber", email="jonas@example.com"),
         ]
         self.currency = currency
+        self.translators = [
+            PlunetResource(id=21, name="A. Laurent", email="a.laurent@example.com"),
+            PlunetResource(id=22, name="M. Rousseau", email="m.rousseau@example.com"),
+        ]
         self.orders: dict[int, ProjectDraft] = {}
         self.quotes: dict[int, tuple[ProjectDraft, QuoteStatus, int | None]] = {}
         self.items: dict[int, _Item] = {}
@@ -122,6 +143,17 @@ class FakePlunetGateway:
     def get_order_id_for_quote(self, quote_id: int) -> int | None:
         return self._quote(quote_id)[2]
 
+    def get_order_number(self, order_id: int) -> str:
+        if order_id not in self.orders:
+            raise self._reject("DataOrder30", f"order {order_id} does not exist")
+        return f"O-{order_id}"
+
+    def get_resource(self, resource_id: int) -> PlunetResource:
+        for r in self.project_managers + self.translators:
+            if r.id == resource_id:
+                return r
+        raise self._reject("DataResource30", f"resource {resource_id} does not exist")
+
     def _delete_project(self, project_id: int) -> None:
         item_ids = {i for i, item in self.items.items() if item.draft.project_id == project_id}
         self.items = {i: v for i, v in self.items.items() if i not in item_ids}
@@ -138,9 +170,13 @@ class FakePlunetGateway:
         self._delete_project(quote_id)
 
     def convert_quote(self, quote_id: int) -> int:
-        """Test helper: what a PM does in Plunet when turning an accepted quote into an order."""
+        """Test helper: what a PM does in Plunet when turning an accepted quote into an order.
+        Like Plunet, the order gets copies of the quote's items (new ids, same reference)."""
         draft, _, _ = self._quote(quote_id)
         order_id = self.create_order(draft).id
+        for item in [i for i in self.items.values() if i.draft.project_type == ProjectType.QUOTE and i.draft.project_id == quote_id]:
+            copy = item.draft.model_copy(update={"project_type": ProjectType.ORDER, "project_id": order_id})
+            self.items[self._next()] = _Item(copy, documents=dict(item.documents))
         self.quotes[quote_id] = (draft, QuoteStatus.CHANGE_INTO_ORDER, order_id)
         return order_id
 
@@ -165,6 +201,20 @@ class FakePlunetGateway:
             raise self._reject("DataItem30", f"item {item_id} does not exist")
         return self.items[item_id]
 
+    def list_items(self, project_type: ProjectType, project_id: int) -> list[PlunetItem]:
+        return [
+            PlunetItem(
+                id=item_id, project_type=project_type, project_id=project_id,
+                description=item.draft.description, reference=item.draft.reference,
+                source_lang=item.draft.source_lang, target_lang=item.draft.target_lang, status=item.status,
+            )
+            for item_id, item in self.items.items()
+            if item.draft.project_type == project_type and item.draft.project_id == project_id
+        ]
+
+    def list_item_files(self, project_type: ProjectType, item_id: int) -> list[str]:
+        return sorted(self._item(item_id).documents)
+
     def set_item_status(self, project_type: ProjectType, item_id: int, status: ItemStatus) -> None:
         self._item(item_id).status = status
 
@@ -173,9 +223,12 @@ class FakePlunetGateway:
 
     # --- Jobs -----------------------------------------------------------------------------
 
-    def create_job(self, project_type: ProjectType, project_id: int, item_id: int, job_type: str) -> int:
+    def create_job(
+        self, project_type: ProjectType, project_id: int, item_id: int, job_type: str,
+        start_date: datetime | None = None, due_date: datetime | None = None,
+    ) -> int:
         if job_type not in JOB_TYPES:
-            raise self._reject("DataJob30.insert2", f"unknown job type {job_type}")
+            raise self._reject("DataJob30.insert3", f"unknown job type {job_type}")
         self._item(item_id)
         job_id = self._next()
         self.jobs[job_id] = _Job(
@@ -185,6 +238,8 @@ class FakePlunetGateway:
                 project_type=project_type,
                 job_type=job_type,
                 status=JobStatus.IN_PREPERATION.name,
+                start_date=start_date,
+                due_date=due_date,
             ),
             project_id,
         )
@@ -202,7 +257,21 @@ class FakePlunetGateway:
         return [j.job.model_copy() for j in self.jobs.values() if j.job.item_id == item_id]
 
     def set_job_status(self, project_type: ProjectType, job_id: int, status: JobStatus) -> None:
-        self._job(job_id).job.status = JobStatus(status).name
+        job = self._job(job_id)
+        job.job.status = JobStatus(status).name
+        if status == JobStatus.DELIVERED and not job.output and job.job.item_id in self.items:
+            item = self.items[job.job.item_id]
+            for name, content in item.documents.items():
+                job.output[name] = simulated_translation(content, item.draft.target_lang)
+
+    def list_job_output(self, project_type: ProjectType, job_id: int) -> list[str]:
+        return sorted(self._job(job_id).output)
+
+    def download_job_output(self, project_type: ProjectType, job_id: int, path: str) -> bytes:
+        output = self._job(job_id).output
+        if path not in output:
+            raise self._reject("DataDocument30.download_Document", f"file {path} not found")
+        return output[path]
 
     def assign_resource(self, project_type: ProjectType, job_id: int, resource_id: int) -> None:
         job = self._job(job_id).job

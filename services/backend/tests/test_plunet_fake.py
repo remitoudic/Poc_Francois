@@ -51,3 +51,21 @@ def test_rejects_unknown_references():
     item = gw.create_item(ItemDraft(project_type=ProjectType.ORDER, project_id=order.id, description="x", source_lang="en", target_lang="fr"))
     with pytest.raises(PlunetBusinessError):
         gw.create_job(ProjectType.ORDER, order.id, item, "XYZ")
+
+
+def test_delivered_job_has_a_translated_file_and_conversion_copies_items():
+    gw = FakePlunetGateway()
+    quote = gw.create_quote(ProjectDraft(project_name="Careers", customer_id=2))
+    item = gw.create_item(ItemDraft(project_type=ProjectType.QUOTE, project_id=quote.id, description="P01",
+                                    source_lang="en", target_lang="fr", reference="FOX-P7"))
+    gw.upload_document(ProjectType.QUOTE, item, "p421.fr.xlf", b"<source>Hi</source><target/>")
+    order_id = gw.convert_quote(quote.id)
+    [order_item] = gw.list_items(ProjectType.ORDER, order_id)
+    assert order_item.reference == "FOX-P7" and order_item.id != item
+    assert gw.list_item_files(ProjectType.ORDER, order_item.id) == ["p421.fr.xlf"]
+
+    job = gw.create_job(ProjectType.ORDER, order_id, order_item.id, "TRA")
+    assert gw.list_job_output(ProjectType.ORDER, job) == []
+    gw.set_job_status(ProjectType.ORDER, job, JobStatus.DELIVERED)
+    [name] = gw.list_job_output(ProjectType.ORDER, job)
+    assert gw.download_job_output(ProjectType.ORDER, job, name) == b"<source>Hi</source><target>[fr] Hi</target>"
