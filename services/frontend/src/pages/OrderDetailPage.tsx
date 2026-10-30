@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type OrderActionName, type Position, type WorkflowAction } from '../api';
+import { api, orderLabel, type OrderActionName, type Position, type WorkflowAction } from '../api';
 import { ErrorState, Loading } from '../components/Feedback';
 import { SegmentBar } from '../components/SegmentBar';
 import { KindTag, OrderTag, Tag } from '../components/StatusTag';
@@ -59,14 +59,14 @@ export function OrderDetailPage() {
   return (
     <div className="stack-md">
       <nav aria-label="Breadcrumb" className="crumb">
-        <Link to="/orders">{t('order.breadcrumb')}</Link> <span aria-hidden="true">/</span> <span className="crumb__here">{o.number}</span>
+        <Link to="/orders">{t('order.breadcrumb')}</Link> <span aria-hidden="true">/</span> <span className="crumb__here">{orderLabel(o)}</span>
       </nav>
 
       <section className="card card--top pad-lg stack-md">
         <div className="page-head">
           <div className="stack-xs">
             <div className="wrap">
-              <span className="mono strong">{o.number}</span>
+              <span className="mono strong">{orderLabel(o)}</span>
               <KindTag kind={o.kind} />
               <OrderTag status={o.status} />
               {o.overdue && <span className="flag">{t('orders.overdue')}</span>}
@@ -74,15 +74,15 @@ export function OrderDetailPage() {
             <h1 className="h1 h1--sm">{o.title}</h1>
           </div>
           <div className="wrap">
+            {isQuote && (o.status === 'AWAITING_ACCEPTANCE' || o.status === 'ACCEPTED') && (
+              <button type="button" className="btn" disabled={busy} onClick={() => run(() => api.rejectQuote(o.id))}>
+                {t('order.reject')}
+              </button>
+            )}
             {isQuote && o.status === 'AWAITING_ACCEPTANCE' && (
-              <>
-                <button type="button" className="btn" disabled={busy} onClick={() => run(() => api.rejectQuote(o.id))}>
-                  {t('order.reject')}
-                </button>
-                <button type="button" className="btn btn--primary" disabled={busy} onClick={() => run(() => api.acceptQuote(o.id))}>
-                  {t('order.accept')}
-                </button>
-              </>
+              <button type="button" className="btn btn--primary" disabled={busy} onClick={() => run(() => api.acceptQuote(o.id))}>
+                {t('order.accept')}
+              </button>
             )}
             {!isQuote && (
               <>
@@ -105,10 +105,16 @@ export function OrderDetailPage() {
           </div>
         </div>
 
-        {isQuote && o.status === 'AWAITING_ACCEPTANCE' && (
+        {o.status === 'DRAFT' && (
           <div className="banner banner--muted">
-            <strong className="label-strong">{t('orderStatus.AWAITING_ACCEPTANCE')}</strong>
-            <span>{t('order.quoteBanner')}</span>
+            <strong className="label-strong">{t('orderStatus.DRAFT')}</strong>
+            <span>{t('order.draftBanner')}</span>
+          </div>
+        )}
+        {isQuote && (o.status === 'AWAITING_ACCEPTANCE' || o.status === 'ACCEPTED') && (
+          <div className={`banner banner--${o.status === 'ACCEPTED' ? 'wait' : 'muted'}`}>
+            <strong className="label-strong">{t(`orderStatus.${o.status}`)}</strong>
+            <span>{t(o.status === 'ACCEPTED' ? 'order.acceptedBanner' : 'order.quoteBanner')}</span>
           </div>
         )}
         {actionError && <ErrorState error={actionError} />}

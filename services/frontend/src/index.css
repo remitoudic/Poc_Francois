@@ -46,6 +46,10 @@ ol, ul { list-style: none; }
 .topnav__link--quiet { margin-left: auto; font-weight: 400; }
 .demo-badge { font: 700 10px/1 var(--mono); letter-spacing: .1em; border: 1px solid var(--wait); color: #fbbf24; padding: 5px 7px; }
 .health { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #bdbdbd; }
+.actor { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #bdbdbd; }
+.actor__input { height: 28px; width: 130px; padding: 0 8px; border: 1px solid #555; background: transparent; color: #fff; border-radius: 0; font-size: 13px; }
+.actor__input:focus { border-color: #fff; outline: none; }
+.actor__input::placeholder { color: #8a8a8a; }
 .topbar .seg { border-color: #444; }
 .topbar .seg__btn { color: #bdbdbd; }
 .topbar .seg__btn[aria-pressed='true'] { background: #fff; color: var(--ink); }

@@ -176,6 +176,7 @@ services:
     restart: unless-stopped
     environment:
       - VITE_BACKEND_URL=http://api:8000
+      - VITE_API_MODE=${VITE_API_MODE:-http}  # "mock" = demo data in the browser
     ports:
       - "3000:3000"
     volumes:

@@ -236,6 +236,14 @@ async def test_completed_position_note_comes_from_the_delivery(client):
     assert note == "Delivered to Polylang as post #512"
 
 
+async def test_health_reports_the_plunet_gateway(client, monkeypatch):
+    from app.routers import health
+
+    monkeypatch.setattr(health, "get_plunet_gateway", lambda: FakePlunetGateway())
+    body = (await client.get("/health")).json()
+    assert body["plunet"]["success"] is True and body["plunet"]["version"] == "fake"
+
+
 # --- quotes --------------------------------------------------------------------------------------
 
 
@@ -250,6 +258,11 @@ async def test_accept_and_reject_quotes(client):
 
     res = await client.post(f"/orders/{quote['id']}/reject", json={"reason": "Too expensive"})
     assert res.status_code == 202 and client.temporal.signals[-1][2].reason == "Too expensive"
+    db_set(Order, Order.id == quote["id"], status=OrderStatus.ACCEPTED)
+    assert (await client.post(f"/orders/{quote['id']}/accept")).status_code == 409  # already accepted
+    assert (await client.post(f"/orders/{quote['id']}/reject")).status_code == 202  # may still withdraw
+    detail = (await client.get(f"/orders/{quote['id']}")).json()
+    assert detail["positions"][0]["note"] == "Starts when the PM converts the quote into an order in Plunet"
     db_set(Order, Order.id == quote["id"], status=OrderStatus.REJECTED)
     assert (await client.post(f"/orders/{quote['id']}/reject")).status_code == 409
 

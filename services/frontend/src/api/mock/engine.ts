@@ -28,6 +28,7 @@ import {
   type WorkflowAction,
   type WorkflowStatus,
 } from '../types';
+import { getActor } from '../actor';
 import { CUSTOMERS, LANGUAGES, LINGUISTS, POSTS, POST_WORDS, RESOURCES, SITES, TEMPLATES, type SeedPost } from './seed';
 
 const TICK_MS = 3000;
@@ -102,6 +103,8 @@ interface MOrder {
   plunet_quote_id: number | null;
   created_at: number;
   rejected: boolean;
+  /** Ticks since the quote was accepted; the simulated PM converts it after CONVERT_TICKS. */
+  accepted: number | null;
   positions: MPosition[];
 }
 
@@ -138,7 +141,7 @@ function workflowStatus(p: MPosition): WorkflowStatus {
 }
 
 function orderStatus(o: MOrder): OrderStatus {
-  if (o.kind === 'QUOTE') return o.rejected ? 'REJECTED' : 'AWAITING_ACCEPTANCE';
+  if (o.kind === 'QUOTE') return o.rejected ? 'REJECTED' : o.accepted !== null ? 'ACCEPTED' : 'AWAITING_ACCEPTANCE';
   const statuses = o.positions.map(workflowStatus);
   if (statuses.every((s) => s === 'CANCELLED')) return 'CANCELLED';
   if (statuses.every((s) => s === 'COMPLETED' || s === 'CANCELLED')) return 'COMPLETED';
@@ -149,7 +152,7 @@ function orderStatus(o: MOrder): OrderStatus {
 function positionNote(p: MPosition): string | null {
   const status = workflowStatus(p);
   const t = currentTask(p);
-  if (status === 'NOT_STARTED') return 'Starts when the quote is accepted';
+  if (status === 'NOT_STARTED') return orderOf(p).accepted !== null ? 'Starts when the PM converts the quote into an order in Plunet' : 'Starts when the quote is accepted';
   if (status === 'PAUSED') return 'Paused · tasks assigned to people continue in Plunet';
   if (status === 'CANCELLED') return 'Cancelled';
   if (status === 'COMPLETED') return p.note;
@@ -389,8 +392,24 @@ function stepPosition(p: MPosition): void {
   }
 }
 
+const CONVERT_TICKS = 4;
+
+/** The PM converts an accepted quote into an order in Plunet; FOX MLO picks it up. */
+function convertQuote(o: MOrder): void {
+  o.kind = 'ORDER';
+  o.accepted = null;
+  o.number = `AU-${year}-${String(++ids.orderNo).padStart(4, '0')}`;
+  o.plunet_order_id = 97600 + o.id;
+  o.positions.forEach((p) => (p.plunet_item_id = ++ids.item));
+  emit(`Quote converted into Plunet order ${o.number}; workflows start`, { o, kind: 'STATE', actor: 'plunet' });
+  o.positions.forEach((p) => startTask(p, p.tasks[0]));
+}
+
 function tick(): void {
-  for (const o of orders) for (const p of o.positions) stepPosition(p);
+  for (const o of orders) {
+    if (o.kind === 'QUOTE' && o.accepted !== null && !o.rejected && ++o.accepted >= CONVERT_TICKS) convertQuote(o);
+    for (const p of o.positions) stepPosition(p);
+  }
 }
 
 // ---------------------------------------------------------------- building orders
@@ -476,6 +495,7 @@ function newOrder(fields: { kind: OrderKind; title: string; customer: Ref; pm: R
     plunet_quote_id: isQuote ? 41200 + ids.order : null,
     created_at: now() - (fields.createdAgo ?? 0),
     rejected: false,
+    accepted: null,
     positions: [],
   };
   orders.push(o);
@@ -573,7 +593,7 @@ function findPosition(id: number): MPosition {
   throw new ApiError(404, `Position ${id} not found`);
 }
 
-const ACTOR = 'you';
+const actor = () => getActor() || 'you';
 
 function applyAction(p: MPosition, a: WorkflowAction): void {
   const status = workflowStatus(p);
@@ -582,17 +602,17 @@ function applyAction(p: MPosition, a: WorkflowAction): void {
     case 'pause':
       if (status !== 'RUNNING' && status !== 'WAITING') throw conflict(`Cannot pause a workflow that is ${status}`);
       p.paused = true;
-      emit('Workflow paused. Tasks assigned to people continue in Plunet.', { p, kind: 'ACTION', actor: ACTOR, reason: a.reason });
+      emit('Workflow paused. Tasks assigned to people continue in Plunet.', { p, kind: 'ACTION', actor: actor(), reason: a.reason });
       return;
     case 'resume':
       if (status !== 'PAUSED') throw conflict(`Cannot resume a workflow that is ${status}`);
       p.paused = false;
-      emit('Workflow resumed', { p, kind: 'ACTION', actor: ACTOR, reason: a.reason });
+      emit('Workflow resumed', { p, kind: 'ACTION', actor: actor(), reason: a.reason });
       return;
     case 'retry': {
       const t = currentTask(p);
       if (!t || t.status !== 'FAILED') throw conflict('Retry is only possible on a failed task');
-      emit(`Retry requested for ${label(t.type)}`, { p, t, kind: 'ACTION', actor: ACTOR, reason: a.reason });
+      emit(`Retry requested for ${label(t.type)}`, { p, t, kind: 'ACTION', actor: actor(), reason: a.reason });
       startTask(p, t);
       return;
     }
@@ -612,7 +632,7 @@ function applyAction(p: MPosition, a: WorkflowAction): void {
       if (from.type === 'TRA' || from.type === 'IMPORT') p.translated = false;
       p.paused = false;
       p.note = null;
-      emit(`Restarted from ${label(from.type)}`, { p, t: from, kind: 'ACTION', actor: ACTOR, reason: a.reason });
+      emit(`Restarted from ${label(from.type)}`, { p, t: from, kind: 'ACTION', actor: actor(), reason: a.reason });
       startTask(p, from);
       return;
     }
@@ -627,7 +647,7 @@ function applyAction(p: MPosition, a: WorkflowAction): void {
       }
       p.cancelled = true;
       p.paused = false;
-      emit('Workflow cancelled; open Plunet jobs set to CANCELED', { p, kind: 'ACTION', actor: ACTOR, reason: a.reason });
+      emit('Workflow cancelled; open Plunet jobs set to CANCELED', { p, kind: 'ACTION', actor: actor(), reason: a.reason });
   }
 }
 
@@ -698,28 +718,25 @@ export const mockApi: Api = {
       o.destination_url = req.destination_url;
       let no = 0;
       for (const id of req.post_ids) for (const lang of req.target_langs) o.positions.push(buildPosition(o, post(id), lang, ++no, req.destination, req.destination_url));
-      emit(req.kind === 'QUOTE' ? 'Quote created in Plunet' : `Order created in Plunet with ${no} items; workflows starting`, { o, kind: 'ACTION', actor: ACTOR });
+      emit(req.kind === 'QUOTE' ? 'Quote created in Plunet' : `Order created in Plunet with ${no} items; workflows starting`, { o, kind: 'ACTION', actor: actor() });
       if (o.kind === 'ORDER') o.positions.forEach((p) => startTask(p, p.tasks[0]));
       return detailDto(o);
     }),
   acceptQuote: (id) =>
     delay(() => {
       const o = findOrder(id);
-      if (o.kind !== 'QUOTE' || o.rejected) throw new ApiError(409, 'Only an open quote can be accepted');
-      o.kind = 'ORDER';
-      o.number = `AU-${year}-${String(++ids.orderNo).padStart(4, '0')}`;
-      o.plunet_order_id = 97600 + o.id;
-      o.positions.forEach((p) => (p.plunet_item_id = ++ids.item));
-      emit(`Quote accepted and converted to order ${o.number} in Plunet; workflows starting`, { o, kind: 'ACTION', actor: ACTOR });
-      o.positions.forEach((p) => startTask(p, p.tasks[0]));
+      if (o.kind !== 'QUOTE' || o.rejected || o.accepted !== null) throw new ApiError(409, 'Only an open quote can be accepted');
+      o.accepted = 0;
+      emit('Quote accepted; waiting for the PM to convert it into an order in Plunet', { o, kind: 'ACTION', actor: actor() });
       return detailDto(o);
     }),
   rejectQuote: (id) =>
     delay(() => {
       const o = findOrder(id);
       if (o.kind !== 'QUOTE' || o.rejected) throw new ApiError(409, 'Only an open quote can be rejected');
+      o.accepted = null;
       o.rejected = true;
-      emit('Quote rejected', { o, kind: 'ACTION', actor: ACTOR });
+      emit('Quote rejected', { o, kind: 'ACTION', actor: actor() });
       return detailDto(o);
     }),
   orderAction: (id, action) =>

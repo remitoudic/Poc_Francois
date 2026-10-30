@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type EventItem, type Task, type WorkflowAction, type WorkflowStatus } from '../api';
+import { api, orderLabel, type EventItem, type Task, type WorkflowAction, type WorkflowStatus } from '../api';
 import { Dialog } from '../components/Dialog';
 import { ErrorState, Loading } from '../components/Feedback';
 import { Kpi } from '../components/Kpi';
@@ -105,7 +105,7 @@ export function WorkflowPage() {
     <div className="stack-md">
       <nav aria-label="Breadcrumb" className="crumb">
         <Link to="/orders">{t('order.breadcrumb')}</Link> <span aria-hidden="true">/</span>{' '}
-        <Link to={`/orders/${orderId}`}>{order.number}</Link> <span aria-hidden="true">/</span>{' '}
+        <Link to={`/orders/${orderId}`}>{orderLabel(order)}</Link> <span aria-hidden="true">/</span>{' '}
         <span className="crumb__here">{t('wf.breadcrumbPosition', { no })}</span>
       </nav>
 

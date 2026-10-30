@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type OrderKind, type OrderSummary } from '../api';
+import { api, orderLabel, type OrderKind, type OrderSummary } from '../api';
 import { ErrorState, Loading } from '../components/Feedback';
 import { Kpi } from '../components/Kpi';
 import { SegmentBar } from '../components/SegmentBar';
@@ -33,7 +33,7 @@ export function OrdersPage() {
         .filter((o) => !attention || needsAttention(o))
         .filter((o) => !pmId || o.pm?.id === pmId)
         .filter((o) => !customerId || o.customer?.id === customerId)
-        .filter((o) => !q || `${o.number} ${o.title} ${o.customer?.name}`.toLowerCase().includes(q.toLowerCase())),
+        .filter((o) => !q || `${orderLabel(o)} ${o.title} ${o.customer?.name}`.toLowerCase().includes(q.toLowerCase())),
     [all, kind, attention, pmId, customerId, q],
   );
 
@@ -61,7 +61,7 @@ export function OrdersPage() {
         <Kpi label={t('orders.kpi.failed')} value={count('FAILED')} sub={t('orders.kpi.failed.sub')} tone="fail" />
         <Kpi
           label={t('orders.kpi.quotes')}
-          value={all.filter((o) => o.status === 'AWAITING_ACCEPTANCE').length}
+          value={all.filter((o) => o.status === 'AWAITING_ACCEPTANCE' || o.status === 'ACCEPTED').length}
           sub={t('orders.kpi.quotes.sub')}
         />
       </section>
@@ -128,7 +128,7 @@ export function OrdersPage() {
                 return (
                   <Link key={o.id} to={`/orders/${o.id}`} className="olist__row olist__link">
                     <span className="stack-xs">
-                      <span className="mono strong">{o.number}</span>
+                      <span className="mono strong">{orderLabel(o)}</span>
                       <KindTag kind={o.kind} />
                     </span>
                     <span className="stack-0 min0">

@@ -249,7 +249,7 @@ async def collect_sync_targets() -> SyncTargets:
         quotes = await session.execute(
             select(Order.id, Order.plunet_quote_id).where(
                 Order.kind == OrderKind.QUOTE,
-                Order.status == OrderStatus.AWAITING_ACCEPTANCE,
+                Order.status.in_([OrderStatus.AWAITING_ACCEPTANCE, OrderStatus.ACCEPTED]),
                 Order.plunet_quote_id.is_not(None),
             )
         )

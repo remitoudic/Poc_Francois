@@ -73,7 +73,8 @@ export function NewOrderPage() {
         title: title.trim() || t('wizard.untitled'),
         customer_id: customerId!,
         pm_resource_id: pmId!,
-        deadline: deadline ? new Date(deadline).toISOString() : null,
+        // A date means the end of that day, in the user's time zone.
+        deadline: deadline ? new Date(`${deadline}T23:59:59`).toISOString() : null,
         source_site: site!,
         source_lang: sourceLang!,
         post_ids: postIds,
@@ -234,7 +235,6 @@ export function NewOrderPage() {
                     </span>
                   </button>
                 ))}
-                <span className="small muted">{t('wizard.overrideHint')}</span>
               </fieldset>
 
               <fieldset className="fieldset stack-sm">

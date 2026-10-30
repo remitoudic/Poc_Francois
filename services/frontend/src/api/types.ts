@@ -5,6 +5,8 @@ export type OrderKind = 'ORDER' | 'QUOTE';
 export type OrderStatus =
   | 'DRAFT'
   | 'AWAITING_ACCEPTANCE'
+  /** Quote accepted; waits for the PM to convert it into an order in Plunet. */
+  | 'ACCEPTED'
   | 'REJECTED'
   | 'RUNNING'
   | 'NEEDS_ATTENTION'
@@ -228,6 +230,11 @@ export interface Api {
   analytics(groupBy: 'pm' | 'customer'): Promise<AnalyticsSummary>;
   /** Live events (SSE in http mode). Calls `onResync` when events may have been missed. */
   subscribe(scope: EventScope, onEvent: (e: EventItem) => void, onResync?: () => void): () => void;
+}
+
+/** The order number from Plunet, or the FOX MLO id until Plunet has created the order. */
+export function orderLabel(o: { id: number; number: string | null }): string {
+  return o.number ?? `#${o.id}`;
 }
 
 export class ApiError extends Error {

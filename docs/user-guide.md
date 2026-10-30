@@ -2,7 +2,9 @@
 
 For project managers who create and follow translation orders. FOX MLO takes posts and pages from a WordPress site (Polylang), sends them through Plunet for translation and review, checks the result, and puts the translations back on the site.
 
-> **Status (October 2026):** the backend described here is complete. Until the interface is connected to it (phase 6), the web app runs on **demo data**: a **DEMO DATA** badge shows in the header and everything resets when you reload the page. The screens and buttons are the same; only the data is simulated.
+> **Your name in the logs.** Until signing in exists, type your name in **Acting as** in the header. It is kept in this browser and shown next to everything you do ("Restart from QA by Claire Dubois"). Left empty, your actions show as "anonymous".
+>
+> A **DEMO DATA** badge in the header means the app runs on simulated data (a demo build): nothing reaches Plunet or the site, and everything resets when you reload the page.
 
 ---
 
@@ -92,10 +94,10 @@ If something is wrong (a post no longer exists in the source language, an unknow
 A quote shows **Awaiting acceptance** and the banner "No workflow runs on a quote".
 
 **When the customer accepts**, either:
-- click **Accept → convert to order** on the quote page, **or**
+- click **Accept quote** on the quote page, **or**
 - set the quote to *Accepted* in Plunet. FOX MLO picks this up within 2 minutes.
 
-Then **the PM converts the quote into an order in Plunet** (Plunet does not allow FOX MLO to do this step). FOX MLO detects the new order within 2 minutes, takes its number, links each position to its item, and starts the workflows. Until then the quote stays in *Awaiting acceptance*; its activity feed says it is waiting for the conversion.
+Then **the PM converts the quote into an order in Plunet** (Plunet does not allow FOX MLO to do this step). FOX MLO detects the new order within 2 minutes, takes its number, links each position to its item, and starts the workflows. Until then the quote shows **Accepted · awaiting conversion**, with a banner saying so. If the customer changes their mind before the conversion, **Reject** is still available: FOX MLO withdraws the quote and sets it to *Rejected* in Plunet.
 
 **When the customer declines:** click **Reject** in FOX MLO, or reject, cancel or let the quote expire in Plunet. The quote becomes **Rejected** and nothing runs.
 
@@ -110,7 +112,7 @@ Then **the PM converts the quote into an order in Plunet** (Plunet does not allo
 **Filters:** type (orders, quotes, needs attention), project manager, customer, and a search on number, title or customer.
 
 **Columns**
-- **Status:** Draft, Awaiting acceptance, Running, **Needs attention** (at least one position failed or is paused), Completed, Cancelled, Rejected.
+- **Status:** Draft, Awaiting acceptance, Accepted · awaiting conversion, Running, **Needs attention** (at least one position failed or is paused), Completed, Cancelled, Rejected.
 - **Positions:** one coloured segment per position — completed, running, waiting on a person, paused, failed, not started — and "3/5 completed".
 - **Deadline:** with **OVERDUE** once passed.
 - **Last activity:** the latest event of the order.
@@ -248,7 +250,8 @@ Costs are shown in the currency most jobs are priced in. Jobs priced in another 
 | "QA failed: n blocking finding(s)" | Section 9. |
 | "No translated .xliff in the output folder" | The linguist delivered without a file, or in another folder. Add the `.xliff` to the job's output folder, then **Retry QA**. |
 | "Plunet job J-… was cancelled in Plunet" | Someone cancelled the job in Plunet. **Retry** creates a new job; **Cancel** stops the position. |
-| A quote stays *Awaiting acceptance* after acceptance | The PM still has to convert it into an order in Plunet. |
+| A quote stays *Accepted · awaiting conversion* | The PM still has to convert it into an order in Plunet. FOX MLO starts the workflows within 2 minutes of the conversion. |
+| A quote stays *Draft* | It could not be created in Plunet (the banner says so). Check that Plunet is online, then create it again. |
 | A button answers with a message instead of acting | The workflow changed state in the meantime (another user, or Plunet). The message says why; the page already shows the current state, so check it before trying again. |
 | "Some services are unavailable" | One of Plunet, Polylang or the workflow engine cannot be reached. Running work is not lost: it continues by itself when the service is back. Tell your administrator if it lasts. |
 | Delivery failed with Polylang or the endpoint | The site refused or was down. Automatic retries happen first; if the task fails, **Retry** once the site works again. |
@@ -257,7 +260,7 @@ Costs are shown in the currency most jobs are priced in. Jobs priced in another 
 
 ## 12. Not available yet
 
-- Signing in. Until then, actions are logged under the name the interface sends, or "anonymous".
+- Signing in. Until then, actions are logged under the name in **Acting as**, or "anonymous".
 - Changing the task list of a single position after creation (the wizard mentions it; it is planned).
 - Assigning a linguist from FOX MLO: assign in Plunet.
 - A real WordPress site: the current setup uses a built-in copy of a Polylang site for testing.

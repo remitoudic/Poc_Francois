@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import unquote
 
 from fastapi import Header, HTTPException
 from temporalio.client import Client, WorkflowUpdateFailedError
@@ -24,8 +25,8 @@ def site_name() -> str:
 
 
 def get_actor(x_fox_actor: str | None = Header(None)) -> str:
-    """Who acts. Until auth exists (phase 7) the UI may send `X-Fox-Actor`; else "anonymous"."""
-    actor = (x_fox_actor or "").strip()
+    """Who acts. Until auth exists (phase 7) the UI sends `X-Fox-Actor` (percent-encoded); else "anonymous"."""
+    actor = unquote(x_fox_actor or "").strip()
     return actor[:MAX_ACTOR] or "anonymous"
 
 

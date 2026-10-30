@@ -12,7 +12,7 @@ Target design: [`backend-architecture.md`](backend-architecture.md). UX source: 
 | 3 — Integrations | **Done** (branch `feat/backend-phase3-integrations`); smoke test passed on the live portal | Plunet SOAP gateway + in-memory fake, Polylang connector, XLIFF parser and QA rules, WSDL-validated tests. See Phase 3 below. |
 | 4 — Workflows | **Done** (branch `feat/backend-phase4-workflows`); end to end in Docker with the fake Plunet | `OrderWorkflow`, `PositionWorkflow`, `PlunetSyncWorkflow` (Schedule), activities on two task queues, dev endpoints. See Phase 4 below. |
 | 5 — API v2 | **Done** (branch `feat/backend-phase5-api`); verified in Docker | Orders, positions, reference data, analytics, matching `services/frontend/src/api/types.ts`. See Phase 5 below. |
-| 6 — Frontend | In progress | New UI built against a mock API (`VITE_API_MODE`, default `mock`); contract in `services/frontend/src/api/types.ts`. Wiring to real endpoints follows phases 3–5. v1 dashboard moved to `/legacy`. |
+| 6 — Frontend | **Done** (branch `feat/frontend-phase6-api`); every page checked in a browser against the API with the fake Plunet | The UI talks to the API (`VITE_API_MODE=http`, the Docker default; `mock` keeps the in-browser demo). `ACCEPTED` quote status, "Acting as" name → `X-Fox-Actor`, contract test between `types.ts` and the API. v1 dashboard at `/legacy`. See Phase 6 below. |
 | 7 — Hardening | Planned | |
 
 Tests: `cd services/backend && uv run python -m pytest` (138 tests: status mapping, broadcaster, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA, workflows in the time-skipping test server, replay of saved histories, API v2 against a Postgres test database). The API tests create and migrate `fox_mlo_test` on `localhost:5433` (override with `TEST_DATABASE_URL`) and are skipped when Postgres is not reachable.
@@ -208,14 +208,20 @@ The contract is the frontend's `services/frontend/src/api/types.ts` and `http.ts
 
 ---
 
-## Phase 6 — Frontend integration (outline; detailed in the UX plan)
+## Phase 6 — Frontend integration
 
 - [x] React Router pages from the design: Orders, New order, Order detail, Position/Workflow detail, Analytics (built against the mock API, PR #2).
 - [x] `useEventStream(scope)` hook (EventSource + refetch on `resync`) wired into the pages.
 - [x] i18n EN/FR.
-- [ ] Switch to the real API (`VITE_API_MODE=http`) and test each page against it; send `X-Fox-Actor`.
-- [ ] Remove the wizard hint about editing one position's tasks, or build it (no API for it yet).
-- [ ] Generate the TypeScript types from `/api/v1/openapi.json` instead of the hand-written `types.ts`.
+- [x] Switch to the real API: `VITE_API_MODE=http` is the default in `docker-compose.yml`; `mock` still runs the demo in the browser.
+- [x] Actor: "Acting as" field in the header (kept in `localStorage`, key `fox.actor`), sent percent-encoded as `X-Fox-Actor`; the API decodes it.
+- [x] Quote status `ACCEPTED` ("Accepted · awaiting conversion"): set when the quote is accepted, until the PM converts it in Plunet. The sync also watches `ACCEPTED` quotes. Reject stays possible: the quote is set to `REJECTED` in Plunet (a WARN event if Plunet refuses; the rejection stands in FOX MLO).
+- [x] Health reports the Plunet gateway in use (`mode`: `soap` or `fake`), so the header is green with the fake Plunet.
+- [x] Removed the wizard hint about editing one position's tasks (no API for it).
+- [x] Contract test instead of generated types: `tests/test_contract.py` parses `types.ts` and compares every interface and status list with the pydantic schemas and enums (fields, optional, nullable). A new interface in `types.ts` fails the test until it is classified. Generating types with `openapi-typescript` was dropped: it does not install with TypeScript 6.
+- [x] Orders without a Plunet number show as `#id`; the deadline is sent as end of day, local time.
+
+**Verified in a browser (2026-10-30)**, production build against the Docker stack with `PLUNET_MODE=fake`: orders list, order detail, workflow page (overview, logs, file), analytics; a quote created in the wizard with "Acting as" set to a name with accents → **Accept quote** → *Accepted · awaiting conversion* → conversion in the fake Plunet (`POST /dev/plunet/quotes/{id}/convert`) → the open page switched to *Running* by itself (SSE), and the log showed the name.
 
 ---
 
