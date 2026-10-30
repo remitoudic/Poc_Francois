@@ -1,7 +1,7 @@
 # Backend Architecture — FOX MLO v2
 
 This document describes the target backend for the redesigned FOX MLO: an orchestrator for **Order → Position → Workflow → Tasks** (Plunet Auftrag → Item → workflow → Plunet Jobs).
-It builds on the UX decisions in [`UX_design_implementation.pdf`](UX_design_implementation.pdf).
+It builds on the UX decisions in [`UX_design_implementation.pdf`](UX_design_implementation.pdf). Implementation status and findings: [`backend-implementation-plan.md`](backend-implementation-plan.md). For users: [`user-guide.md`](user-guide.md).
 
 Three choices define it:
 
@@ -106,7 +106,8 @@ events  (the bus + audit log + logs tab)
   order_id, position_id, task_id, actor, message, reason, data JSONB
 ```
 
-- Migrations move to **Alembic** (today `init_db()` calls `create_all`).
+- Tasks also store `overlay` (orchestrator-only condition) and `findings` (QA results of the last run, JSONB). Templates have a unique `code` (`standard`, `light`, `regulated`).
+- Migrations use **Alembic** (`app/migrations`); the api runs `alembic upgrade head` before starting.
 - The v1 tables (`etl_jobs`, `destination_deliveries`) stay read-only until they are removed in the last phase.
 - `actor` is free text now (`system`, `plunet`, a PM name). It becomes a user id when login arrives.
 
@@ -183,13 +184,20 @@ Commands are **not** sent through NOTIFY. They go to Temporal, which is durable 
 |---|---|---|---|
 | `OrderWorkflow` | `order-{order_id}` | Until all positions finish or the order is cancelled | Creates the order or quote in Plunet. For a quote, **waits for acceptance**. Then starts one child per position and tracks the summary. |
 | `PositionWorkflow` (child) | `position-{position_id}` | One position | Runs the task chain from the template; handles pause, cancel, retry, restart. |
-| `PlunetSyncWorkflow` | `plunet-sync` (Temporal **Schedule**, every 2 min) | Recurring | Reconciliation: reads job and quote status (and prices) from Plunet and **signals** the affected workflows. The only sync path from Plunet (no callbacks). |
+| `PlunetSyncWorkflow` | Schedule `plunet-sync` (every `PLUNET_SYNC_SECONDS`, default 120 s, overlap SKIP); each run is `plunet-sync-run` | Recurring | Reads the status of open jobs and of quotes awaiting acceptance (and their conversion into an order) from Plunet and **signals** the affected workflows. The only sync path from Plunet (no callbacks). |
 
-Task queues: `fox-orchestration` (workflows plus fast activities) and `fox-plunet` (SOAP activities, low concurrency so Plunet is not flooded).
+Task queues: `fox-orchestration` (workflows plus database and Polylang activities) and `fox-plunet` (synchronous SOAP activities on a thread pool, at most `PLUNET_MAX_CONCURRENT_CALLS`, default 4). The worker creates or updates the schedule at start-up.
+
+**Order flow.** `OrderWorkflow` creates the project in Plunet. For an order it starts the positions at once. For a quote it creates the items, imports and uploads each `.xliff`, releases the quote to `PENDING` and waits:
+- *accepted* (button, or seen in Plunet by the sync) → FOX MLO sets `ACCEPTED` in Plunet unless it came from there, then waits for the PM to **convert the quote in Plunet** (the SOAP API cannot);
+- *converted* (seen by the sync through the quote's `orderID`) → `plunet_adopt_order` finds the order's items by the `FOX-P{position_id}` tag in their description, stores the order number, and the positions start;
+- *rejected* (button, or `REJECTED`/`CANCELED`/`EXPIRED` in Plunet) → the order ends as `REJECTED`.
+
+All three signals are idempotent.
 
 ### 5.2 PositionWorkflow: task loop
 
-Each task in the template becomes one step. The workflow holds a cursor and a small state machine:
+Each task in the template becomes one step. The workflow holds a cursor and a small state machine (simplified; the code is `app/workflows/position.py`):
 
 ```python
 @workflow.defn
@@ -229,10 +237,10 @@ class PositionWorkflow:
 
 | Task | Kind | How it runs |
 |---|---|---|
-| `IMPORT` | automatic | Activity: fetch `.xliff` from Polylang → parse → store segments → upload the file to the Plunet item. |
-| `PM`, `TRA`, `REV` (and other Plunet job types) | **human, in Plunet** | Activity creates or assigns the Plunet Job, then the workflow **waits** for a `plunet_job_status` signal (from `PlunetSyncWorkflow`, every 2 min) with a timer for overdue alerts. The task state is `WAITING` while assigned and `RUNNING` while `IN_PROGRESS`. |
-| `QA` | automatic | Activity: checks on every target segment (rules below). A **blocking** finding is a business failure: the task becomes `FAILED` and the workflow waits for Retry, Restart or Cancel. Warnings are logged and shown, but do not stop the workflow. |
-| `DELIVER` | automatic | Activity per destination: `POLYLANG` (create the translated post + `translations[...]` link), `ENDPOINT` (POST), or `NONE` (no-op). |
+| `IMPORT` | automatic | Fetch `.xliff` from Polylang → parse → store segments; create the Plunet item (description `P01 · title · FOX-P{id}`) and upload the file to it. |
+| `PM`, `TRA`, `REV` | **human, in Plunet** | Create the Plunet job (job types `PRM`, `TRA`, `REV` on the FOX instance; start = now, due = order deadline, no resource), then **wait** for `plunet_job_status` signals from the sync. `WAITING` while requested or assigned, `RUNNING` while `IN_PROGRESS`; at `DELIVERED` the job price and assignee are read and the task is `DONE`. A job `CANCELED` in Plunet fails the task. When the order deadline passes, one `WARN` event is written. |
+| `QA` | automatic | Download the translated `.xliff` from the output folder of the last delivered job (REV, else TRA…), then check every target segment (rules below). A **blocking** finding is a business failure: the task becomes `FAILED` and the workflow waits for Retry, Restart or Cancel. Warnings are logged and shown, but do not stop the workflow. |
+| `DELIVER` | automatic | Per destination: `POLYLANG` (create or update the translated post as a draft, linked with `translations[...]`), `ENDPOINT` (POST the file), or `NONE`. Then the Plunet item is set to `DELIVERED`. |
 
 **QA rules (default):**
 
@@ -260,11 +268,11 @@ All controls are **Workflow Updates**: they are synchronous, validated, and retu
 |---|---|---|
 | Pause | update `pause` | `paused = True`; the current task finishes; no new task starts. Human tasks continue in Plunet. |
 | Resume | update `resume` | `paused = False`. |
-| Retry | update `retry` | Valid only when the current task is `FAILED`; re-runs it (`attempts + 1`). |
-| Restart from… | update `restart_from(index, reason?)` | Moves the cursor back; later tasks are reset to `PENDING`. |
-| Cancel | update `cancel(reason)` | Sets the reason; the workflow cancels running activities, runs the compensation activity (Plunet Jobs → `CANCELED`), then ends as `CANCELLED`. |
-| Accept quote | signal `quote_accepted` on `OrderWorkflow` | From the api (button) **or** from Plunet (detected by `PlunetSyncWorkflow`). Idempotent: the second signal is ignored. |
-| Bulk actions | api loops over positions | Same updates per `PositionWorkflow`. |
+| Retry | update `retry` | Valid only when the current task is `FAILED`; re-runs it (`attempts + 1`). A Plunet task gets a **new** job. |
+| Restart from… | update `restart_from(seq, reason?)` | `seq` ≤ current task. An open Plunet job of the current task is cancelled in Plunet first; the tasks from `seq` on are reset to `PENDING` and run again (new Plunet jobs). On a **completed** position the api starts a new `PositionWorkflow` run with `start_from=seq`; attempt counts carry on. |
+| Cancel | update `cancel(reason)` | Reason required. Plunet first (open jobs and the item → `CANCELED`), then `CANCELLED` locally. If the Plunet cleanup fails, the cancellation still stands and a `WARN` event asks for a manual check. |
+| Accept / reject quote | signals `quote_accepted` / `quote_rejected` on `OrderWorkflow` | From the api (button) **or** from Plunet (detected by `PlunetSyncWorkflow`). Idempotent. Conversion arrives as `quote_converted`. |
+| Bulk actions (`pause`, `resume`, `retry_failed`) | api loops over the positions they fit | Same updates per `PositionWorkflow`. |
 
 Every control also writes an `ACTION` event (actor, reason), so it shows in the Logs tab and the activity feed in real time.
 
@@ -274,14 +282,14 @@ Every state change inside a workflow goes through one activity:
 
 ```python
 @activity.defn
-async def record_task_state(change: TaskStateChange) -> None:
-    async with session.begin():
-        await update_task(change)          # tasks row (status, attempts, timestamps, error)
-        await update_position_status(change)
-        await insert_event(change)         # trigger → NOTIFY → SSE
+async def record_task(change: TaskChange) -> None:
+    async with AsyncSessionLocal() as session, session.begin():
+        ...                                # tasks row (status, attempts, timestamps, job, cost, error, findings)
+        ...                                # position status, then the order status recomputed from its positions
+        await add_event(session, ...)      # trigger → NOTIFY → SSE
 ```
 
-Activities must be **idempotent** (Temporal can re-run them): writes are keyed by `(task_id, attempt, status)`, and Plunet creations check for existing ids first.
+Activities must be **idempotent** (Temporal can re-run them): projection writes set absolute values, and every Plunet creation first checks the id already stored in the database and saves the new id in the same activity.
 
 ### 5.6 Determinism rules for workflow code
 
@@ -326,13 +334,13 @@ Automatic tasks (IMPORT, QA, DELIVER) have no Plunet job. Their result is writte
 
 Signals are idempotent: an unchanged status is ignored.
 
-**Assignments** can be made in either system: in Plunet by the PM (picked up by sync), or in FOX MLO (written to Plunet by an activity).
+**Assignments** are made in Plunet by the PM and picked up by the sync. Assigning from FOX MLO (`assign_resource` exists in the gateway) is not exposed yet.
 
-**Conflicts:** if both systems change the same job at the same time, Plunet wins. The reconciliation run overwrites the local copy and writes a `WARN` event.
+**Conflicts:** Plunet wins: the next sync run signals the Plunet status and the workflow follows it. (No dedicated conflict event yet.)
 
 ### 6.3 Cost
 
-Cost comes from **Plunet job prices**. When a job reaches DONE (and again at reconciliation), an activity reads the job's price lines and stores `tasks.cost` + `tasks.currency`. Order and analytics totals are sums of these values. FOX MLO does not keep its own rates.
+Cost comes from **Plunet job prices**. When a job reaches DONE, an activity reads the job price and stores `tasks.cost` + `tasks.currency` (the project currency). Order and analytics totals are sums of these values; analytics reports in the currency most tasks are priced in. FOX MLO does not keep its own rates. Prices changed in Plunet after delivery are not re-read yet.
 
 ### 6.4 Limits
 
@@ -340,7 +348,8 @@ The `fox-plunet` task queue limits concurrent SOAP calls (e.g. `max_concurrent_a
 
 ## 7. Polylang integration
 
-- `SourceConnector` interface: `list_languages()`, `list_posts(lang)`, `get_xliff(post_id, target)`, `publish_translation(source_id, target_lang, xliff)`.
+- `SourceConnector` interface (`app/integrations/source.py`): `list_languages()`, `list_posts(lang, search)`, `get_post(id)`, `get_xliff(post_id, target)`, `publish_translation(source, target_lang, title, segments, status="draft")`. Posts carry a word count.
+- `POLYLANG_SITE` names the site in the UI (default: the host of `POLYLANG_BASE_URL`); one site per installation for now.
 - `PolylangConnector` talks to `polylang-mock` now and to a real WordPress later (URL + application password via env).
 - Mock routes: `/wp-json/pll/v1/languages`, `/wp-json/wp/v2/posts?lang=`, `POST /wp-json/wp/v2/posts[/{id}]?lang=&translations[..]=`, plus the mock-only `/wp-json/pll/v1/posts/{id}/xliff?target=`.
 
@@ -348,40 +357,45 @@ The `fox-plunet` task queue limits concurrent SOAP calls (e.g. `max_concurrent_a
 
 ## 8. API surface (v2)
 
+The contract is the frontend's `services/frontend/src/api/types.ts`; responses are defined in `app/schemas/v2.py`. Details per endpoint: [`api-endpoints.md`](api-endpoints.md).
+
 ```
 Orders
-  GET    /api/v1/orders                    ?kind&status&pm&customer&attention&q
+  GET    /api/v1/orders                    ?kind&status&pm&customer&attention&q&limit&offset
   POST   /api/v1/orders                    create order or quote + positions → starts OrderWorkflow
-  GET    /api/v1/orders/{id}               order + positions + task summary
-  POST   /api/v1/orders/{id}/accept        quote → order (signal)
-  POST   /api/v1/orders/{id}/reject
+  GET    /api/v1/orders/{id}               order + positions + tasks + totals
+  POST   /api/v1/orders/{id}/accept        quote accepted (signal)
+  POST   /api/v1/orders/{id}/reject        {reason?}
   POST   /api/v1/orders/{id}/actions       {action: pause|resume|retry_failed}
 
 Positions / workflows
-  GET    /api/v1/positions/{id}            position + tasks
-  POST   /api/v1/positions/{id}/actions    {action: pause|resume|retry|restart_from|cancel, task_index?, reason?}
-  GET    /api/v1/positions/{id}/events     paginated log (filter: level, kind, task)
+  GET    /api/v1/positions/{id}            position + tasks + order summary
+  POST   /api/v1/positions/{id}/actions    {action: pause|resume|retry|restart_from|cancel, task_seq?, reason?}
+  GET    /api/v1/positions/{id}/events     ?level&kind&task_id&after_id&limit
   GET    /api/v1/positions/{id}/segments
   GET    /api/v1/positions/{id}/xliff      ?variant=raw|processed
 
-Realtime
+Events
+  GET    /api/v1/events                    ?order_id&position_id&after_id&limit (latest first page)
   GET    /api/v1/events/stream             SSE; ?order_id | ?position_id; Last-Event-ID supported
 
 Reference data
-  GET    /api/v1/plunet/resources | /plunet/customers
-  GET    /api/v1/sources/polylang/languages | /posts?lang=
+  GET    /api/v1/plunet/customers | /plunet/resources
   GET    /api/v1/templates
+  GET    /api/v1/sources/polylang/sites | /languages?site | /posts?site&lang&q
 
 Analytics
-  GET    /api/v1/analytics/summary         ?from&to&group_by=pm|customer|order
-
-Plunet
+  GET    /api/v1/analytics/summary         ?group_by=pm|customer&from&to
 
 Health
-  GET    /api/v1/health                    postgres, temporal, plunet, polylang
+  GET    /api/v1/health                    postgres, realtime listener, temporal, polylang, plunet
+  GET    /api/v1/health/live               process only (Docker healthcheck)
+
+Dev (DEV_ENDPOINTS=true only)
+  /api/v1/dev/…                            create orders, drive the fake Plunet
 ```
 
-Commands return `202 Accepted` with the new state if the Temporal update succeeded, or `409 Conflict` with a message if the validator rejected it.
+Commands answer `202 Accepted` with the new state. A validator rejection or a finished workflow gives `409 Conflict` with the workflow's message; a missing workflow `404`; invalid input (e.g. cancel without a reason) `422`; Temporal unreachable `503`. Writes take an optional `X-Fox-Actor` header (the actor in the events) until authentication exists.
 
 ---
 
@@ -395,16 +409,18 @@ PositionWorkflow: IMPORT ─► PM (wait on Plunet) ─► TRA ─► REV ─►
 every step: record_task_state ─► events ─► NOTIFY ─► SSE ─► UI updates live
 ```
 
-**Quote accepted in Plunet**
+**Quote accepted, converted by the PM**
 ```
-PlunetSyncWorkflow (schedule) ─► sees quote status = accepted ─► signal quote_accepted(order-99)
-OrderWorkflow: convert quote → order in Plunet ─► update DB kind=ORDER ─► start PositionWorkflows
+UI Accept ─► signal quote_accepted ─► OrderWorkflow sets ACCEPTED in Plunet ─► waits
+   (or: quote set to ACCEPTED in Plunet ─► PlunetSyncWorkflow ─► signal quote_accepted(in_plunet))
+PM converts the quote in Plunet ─► PlunetSyncWorkflow sees getQuoteObject().orderID ─► signal quote_converted
+OrderWorkflow: plunet_adopt_order (items matched by FOX-P tag, kind=ORDER, number) ─► start PositionWorkflows
 ```
 
 **QA fails, user retries**
 ```
 QA activity returns findings ─► task FAILED + ERROR event ─► UI banner "QA failed"
-user fixes in Plunet, clicks Retry ─► POST /positions/{id}/actions {retry}
+linguist corrects the file in the job's output folder, user clicks Retry ─► POST /positions/{id}/actions {retry}
 api ─► update retry ─► validator OK ─► QA runs again (attempt 2) ─► DONE ─► DELIVER
 ```
 
@@ -418,7 +434,7 @@ api ─► update retry ─► validator OK ─► QA runs again (attempt 2) ─
 - **temporal-ui** binds to `127.0.0.1:8088` only; reach it through an SSH tunnel. It must never be exposed through the public proxy.
 - **Plunet sync:** polling only (no inbound route from Plunet). If callbacks are added later, they need an HTTPS route protected by a shared secret and an IP allowlist.
 - **Temporal namespace:** `fox-mlo`, with workflow history retention of 30 days.
-- **Health:** `/health` checks Postgres, the Temporal client connection, Plunet login, and Polylang reachability.
+- **Health:** `/health` checks Postgres, the realtime listener, the Temporal connection, Polylang reachability and the Plunet version.
 - **Logging:** structured JSON logs from api and worker. Business logs go to `events`, technical logs go to stdout.
 - **Secrets:** Plunet and WordPress credentials only in `.env` and the worker environment. The frontend never sees them.
-- **Future auth:** the api gets a user from a dependency (`get_actor()`), currently returning `system/anonymous`. When login is added, it fills `events.actor` and enables per-PM filters, with no changes to workflows.
+- **Future auth:** the api gets the actor from a dependency (`get_actor()`), which today reads the optional `X-Fox-Actor` header and falls back to `anonymous`. When login is added, it fills `events.actor` and enables per-PM filters, with no changes to workflows.

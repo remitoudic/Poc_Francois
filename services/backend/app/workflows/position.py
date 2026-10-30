@@ -48,7 +48,7 @@ class _Task:
     def __init__(self, spec: TaskSpec):
         self.spec = spec
         self.status = TaskStatus.PENDING
-        self.attempts = 0
+        self.attempts = spec.attempts
         self.job_id: int | None = None
         self.job_status: str | None = None
         self.error: str | None = None

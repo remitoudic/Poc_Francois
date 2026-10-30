@@ -11,11 +11,11 @@ Target design: [`backend-architecture.md`](backend-architecture.md). UX source: 
 | 2 — Data model + realtime | **Done** | Migration `0002`: v2 tables, seeded templates, `events` + `notify_event()` trigger. One LISTEN connection per api process → broadcaster → `GET /api/v1/events/stream` (SSE, scopes, `Last-Event-ID` replay, heartbeat, `resync`). Verified end to end: `POST /api/v1/system/check-workflow` → Temporal → worker activity → `events` → NOTIFY → SSE; a rolled-back insert is never delivered. |
 | 3 — Integrations | **Done** (branch `feat/backend-phase3-integrations`); smoke test passed on the live portal | Plunet SOAP gateway + in-memory fake, Polylang connector, XLIFF parser and QA rules, WSDL-validated tests. See Phase 3 below. |
 | 4 — Workflows | **Done** (branch `feat/backend-phase4-workflows`); end to end in Docker with the fake Plunet | `OrderWorkflow`, `PositionWorkflow`, `PlunetSyncWorkflow` (Schedule), activities on two task queues, dev endpoints. See Phase 4 below. |
-| 5 — API v2 | Planned | |
+| 5 — API v2 | **Done** (branch `feat/backend-phase5-api`); verified in Docker | Orders, positions, reference data, analytics, matching `services/frontend/src/api/types.ts`. See Phase 5 below. |
 | 6 — Frontend | In progress | New UI built against a mock API (`VITE_API_MODE`, default `mock`); contract in `services/frontend/src/api/types.ts`. Wiring to real endpoints follows phases 3–5. v1 dashboard moved to `/legacy`. |
 | 7 — Hardening | Planned | |
 
-Tests: `cd services/backend && uv run python -m pytest` (116 tests: status mapping, broadcaster, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA, workflows in the time-skipping test server, replay of saved histories).
+Tests: `cd services/backend && uv run python -m pytest` (138 tests: status mapping, broadcaster, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA, workflows in the time-skipping test server, replay of saved histories, API v2 against a Postgres test database). The API tests create and migrate `fox_mlo_test` on `localhost:5433` (override with `TEST_DATABASE_URL`) and are skipped when Postgres is not reachable.
 
 Each phase ends in a working, testable system and can be merged on its own. Phases 1–3 can partly run in parallel.
 
@@ -187,23 +187,35 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 
 **Goal:** every endpoint the new UI needs (architecture §8).
 
-- [ ] Routers: `orders`, `positions`, `events`, `reference` (Plunet resources and customers, Polylang, templates), `analytics`, `health`.
-- [ ] `POST /orders`: validate, insert order and positions in one transaction plus a `CREATED` event, then start `OrderWorkflow` with `id=order-{id}` (start is idempotent on workflow id, so a retried request is safe).
-- [ ] Actions call Temporal **updates**; validator rejections map to `409`; an unknown workflow maps to `404`.
-- [ ] List filters (`attention` = failed, paused or overdue), pagination, sorting.
-- [ ] Analytics queries on `tasks`: duration per task type, cost, error counts, grouped by PM, customer or order, over a time range.
-- [ ] Pydantic v2 schemas generated into an OpenAPI spec; the frontend generates its TypeScript client from it.
+The contract is the frontend's `services/frontend/src/api/types.ts` and `http.ts`; responses mirror it (`app/schemas/v2.py`), built from the read model in `app/api/views.py`.
+
+- [x] Routers: `orders`, `positions`, `reference` (Plunet customers and PMs, templates, Polylang sites, languages, posts), `analytics`; `events` and `health` kept.
+- [x] `POST /orders`: checks the template, customer, PM, site, languages and that every post exists in the source language in Polylang (422 otherwise); saves the order, one position per post × target language with the template's tasks, and an event in one transaction; then starts `OrderWorkflow` `order-{id}`. A start that is already running is ignored; if Temporal is down the order stays `DRAFT` and the call answers 503.
+- [x] Actions are Temporal updates: validator rejection → `409` with its message, finished workflow → `409`, no workflow → `404`, Temporal down → `503`. Cancel without a reason → `422`. Order actions (`pause`, `resume`, `retry_failed`) apply to every position they fit; `409` when none does.
+- [x] Restart of a **completed** position starts a new `PositionWorkflow` run from the chosen task (`start_from`); attempt counts carry on.
+- [x] Accept / reject a quote: signals to `OrderWorkflow`, only while the quote is `DRAFT` or `AWAITING_ACCEPTANCE`.
+- [x] Lists: `kind`, `status`, `pm`, `customer`, `attention` (needs attention or past the deadline), `q` (number, title, customer), `limit`/`offset`, newest first. Events: without `after_id`, the latest `limit` events (oldest first); with it, the events after it. Position events filter on `level`, `kind`, `task_id`.
+- [x] Server-side display fields: position `note` (what it waits for, the error, the delivery result), task `overlay` (`FAILED`, `PAUSED`), `overdue`, order `totals`, `last_activity`. Times are sent in UTC with an offset.
+- [x] Reference data: Plunet customers and PMs are cached in `customers`/`resources` and re-read at most every `REFERENCE_CACHE_SECONDS`; the API uses the local ids. `POLYLANG_SITE` names the site (default: the host of `POLYLANG_BASE_URL`). Polylang posts carry a word count.
+- [x] Analytics `GET /analytics/summary?group_by=pm|customer&from&to`: orders (not quotes), positions, completed, average lead time of completed positions, cost, ERROR events. Cost is reported in the currency most tasks are priced in; other currencies are left out.
+- [x] Actor: `X-Fox-Actor` header until auth (phase 7), else `anonymous`.
+- [x] OpenAPI at `/api/v1/openapi.json` (FastAPI). The frontend keeps its hand-written types for now; generating them is part of Phase 6.
 - [ ] Keep the v1 `/etl/*` routes until the frontend has switched, then delete them (Phase 7).
 
-**Tests:** API tests with a test database and a Temporal test server (or a mocked Temporal client for fast unit tests).
+**Tests** (`tests/test_api.py`, harness in `tests/api_fakes.py`): real Postgres test database, the Polylang mock app in-process, the fake Plunet, and a recording Temporal client. Covers reference data and the cache, order creation and every validation, Temporal down, list filters and paging, notes / overlays / totals, delivery note, quote accept and reject, position and order actions with their error codes, restart of a completed position, event paging, segments with findings, xliff download, analytics.
+
+**Verified in Docker (2026-10-30)** with `PLUNET_MODE=fake POLYLANG_SITE=maison-lumiere.com`: order created through `POST /orders` (2 posts, light template), paused and resumed through `/positions/{id}/actions` (an invalid resume answered 409, a cancel without reason 422), jobs delivered in the fake Plunet, order `COMPLETED`; segments, xliff download, latest events, attention filter and analytics read back; a completed position restarted from QA ran again in a new workflow run.
 
 ---
 
 ## Phase 6 — Frontend integration (outline; detailed in the UX plan)
 
-- [ ] React Router pages from the design: Orders, New order, Order detail, Position/Workflow detail, Analytics.
-- [ ] `useEventStream(scope)` hook (EventSource + refetch on `resync`) wired into the pages, e.g. with TanStack Query invalidation.
-- [ ] i18n EN/FR.
+- [x] React Router pages from the design: Orders, New order, Order detail, Position/Workflow detail, Analytics (built against the mock API, PR #2).
+- [x] `useEventStream(scope)` hook (EventSource + refetch on `resync`) wired into the pages.
+- [x] i18n EN/FR.
+- [ ] Switch to the real API (`VITE_API_MODE=http`) and test each page against it; send `X-Fox-Actor`.
+- [ ] Remove the wizard hint about editing one position's tasks, or build it (no API for it yet).
+- [ ] Generate the TypeScript types from `/api/v1/openapi.json` instead of the hand-written `types.ts`.
 
 ---
 
@@ -214,7 +226,8 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 - [ ] Backups: `pg_dump` of `fox_mlo`, `temporal` and `temporal_visibility`; a restore test.
 - [ ] Observability: Temporal SDK metrics (Prometheus endpoint on the worker), api request logs, alerts on failed workflows and listener reconnect loops.
 - [ ] Load check: 50 orders × 10 positions; SSE with 20 open clients.
-- [ ] Update `docs/architecture.md`, `api-endpoints.md` and `directory-structure.md`.
+- [x] Update `docs/architecture.md`, `api-endpoints.md` and `directory-structure.md` (done with phase 5; keep them current).
+- [ ] Authentication; `get_actor()` returns the signed-in user.
 
 ---
 
@@ -224,7 +237,8 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 |---|---|---|
 | Unit | pytest | XLIFF parse and QA, status mapping, gateways with fakes |
 | Workflow | `temporalio.testing` (time-skipping) | All control paths, quote acceptance, determinism replay |
-| Integration | docker compose + pytest | API ↔ Temporal ↔ Postgres ↔ polylang-mock; SSE delivery |
+| API | pytest + Postgres test database (`fox_mlo_test`) | Every v2 endpoint with the Polylang mock app, the fake Plunet and a recording Temporal client |
+| End to end | docker compose, `PLUNET_MODE=fake`, dev endpoints | API ↔ Temporal ↔ Postgres ↔ polylang-mock; done manually per phase |
 | Manual | Plunet test portal | One real order, quote → order, cancel |
 
 ## Risks and mitigations
@@ -234,7 +248,7 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 | Plunet SOAP is slow or rate-limited | Dedicated `fox-plunet` queue with low concurrency; retries with backoff; polling every 2 min, not per workflow. |
 | Workflow code changes break running workflows | `workflow.patched()` versioning + replay tests in CI. |
 | Missed NOTIFY (listener down) | Outbox table + `Last-Event-ID` replay + `resync` refetch. |
-| DB read model and Temporal state drift apart | All writes through `record_task_state`; a workflow `state` query for checks; an admin "re-project" activity. |
+| DB read model and Temporal state drift apart | All writes through the projection activities (`record_task`…); a workflow `state` query for checks; an admin "re-project" activity (later). |
 | Temporal upgrades | Pinned image versions; upgrade one minor version at a time; `temporal-setup` applies schema updates before the server starts. |
 | Changes made in Plunet show up late | Polling every 2 min is the only sync path; changes appear within about 2 min. The interval can be lowered if the SOAP load allows. |
 | Temporal shares the Postgres server | Separate databases; monitor connections; split to its own server later if needed. |
@@ -249,10 +263,12 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 | 4 | Cost source | Plunet job prices. |
 | 5 | Hosting | The single VPS, including Temporal, for now. |
 | 6 | Quote acceptance in FOX MLO (the API cannot convert a quote) | FOX MLO sets the quote to `ACCEPTED`; the PM converts it in Plunet; FOX MLO detects the new order and starts the workflows. |
-| 7 | Required job fields | Common defaults until known: due date from the position (else order) deadline, start date now, no resource on creation, prices from Plunet's price list. Adjust once the FOX Plunet setup is confirmed. |
+| 7 | Required job fields | Common defaults until known: due date = order deadline, start date now, no resource on creation, prices from Plunet's price list. Adjust once the FOX Plunet setup is confirmed. |
 | – | Temporal version | Latest stable: server 1.32.1, UI 2.57.0, Python SDK 1.35.0. |
 
 ## Still open
 
 1. Confirm the required job fields on the FOX Plunet setup (decision 7 uses common defaults).
-2. Job type short names `PM` and `REV` on the FOX instance (`TRA` is confirmed); check with `scripts/plunet_smoke.py --job-type PM` / `REV`.
+2. ~~Job type short names~~ Resolved: `PRM`, `TRA` and `REV` (there is no `PM`), verified with `scripts/plunet_smoke.py`.
+3. Where linguists put the translated file: FOX MLO reads it from the job's output folder (`ORDER_JOB_OUT`). Confirm this matches how FOX linguists deliver in Plunet.
+4. Real WordPress site: URL and application password, and whether translations should be published or stay drafts (drafts today).

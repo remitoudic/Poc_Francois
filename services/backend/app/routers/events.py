@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.database import AsyncSessionLocal
 from app.models.orchestration import Event
 from app.realtime.broadcaster import RESYNC, broadcaster
-from app.realtime.events import scoped_events_query, serialize_event
+from app.realtime.events import page_events, scoped_events_query, serialize_event
 
 router = APIRouter(prefix="/events", tags=["Realtime"])
 
@@ -81,10 +81,10 @@ async def stream_events(
 async def list_events(
     order_id: int | None = Query(None),
     position_id: int | None = Query(None),
-    after_id: int = Query(0),
-    limit: int = Query(200, le=1000),
+    after_id: int | None = Query(None, description="Events after this id; without it, the latest ones"),
+    limit: int = Query(200, ge=1, le=1000),
 ):
-    """Paginated event history (Logs tab)."""
-    query = scoped_events_query(order_id, position_id).where(Event.id > after_id).limit(limit)
+    """Event history, oldest first (Logs tab and the order activity feed)."""
     async with AsyncSessionLocal() as session:
-        return [serialize_event(e) for e in (await session.scalars(query)).all()]
+        events = await page_events(session, scoped_events_query(order_id, position_id), after_id, limit)
+        return [serialize_event(e) for e in events]
