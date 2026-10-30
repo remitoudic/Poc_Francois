@@ -86,7 +86,7 @@ def test_half_created_quote_is_deleted():
 
 
 def test_create_item_sets_language_combination():
-    gw, soap = gateway({("DataItem30", "insert2"): ok(5105)})
+    gw, soap = gateway({("DataItem30", "insert2"): ok(5105), ("DataItem30", "addLanguageCombination"): ok(38878)})
     item_id = gw.create_item(ItemDraft(
         project_type=ProjectType.ORDER, project_id=414, description="P05 · Behind the atelier",
         source_lang="en", target_lang="fr",
@@ -94,6 +94,9 @@ def test_create_item_sets_language_combination():
     assert item_id == 5105
     lang = soap.kwargs("DataItem30", "addLanguageCombination")
     assert (lang["sourceLanguage"], lang["targetLanguage"], lang["itemID"], lang["projectID"]) == ("English", "French", 5105, 414)
+    assert soap.kwargs("DataItem30", "setLanguageCombinationID") == {
+        "UUID": "uuid-1", "languageCombinationID": 38878, "projectType": 3, "itemID": 5105,
+    }
 
 
 @pytest.mark.parametrize(
@@ -180,11 +183,29 @@ def test_expired_session_logs_in_again_once():
 
 
 def test_refusal_is_a_business_error_and_not_retried():
-    gw, soap = gateway({("DataJob30", "insert2"): failed(-14, "Job type XYZ does not exist")})
+    gw, soap = gateway({("DataJob30", "insert3"): failed(-14, "Job type XYZ does not exist")})
     with pytest.raises(PlunetBusinessError) as err:
         gw.create_job(ProjectType.ORDER, 414, 5105, "XYZ")
     assert isinstance(err.value, BusinessError) and err.value.status_code == -14
-    assert soap.ops().count("DataJob30.insert2") == 1
+    assert soap.ops().count("DataJob30.insert3") == 1
+
+
+def test_create_job_with_dates_and_no_resource():
+    gw, soap = gateway({("DataJob30", "insert3"): ok(88213)})
+    assert gw.create_job(ProjectType.ORDER, 414, 5105, "TRA", due_date=DRAFT.deadline) == 88213
+    call = soap.kwargs("DataJob30", "insert3")
+    assert call["JobTypeShort"] == "TRA"
+    assert call["JobIN"]["dueDate"] == DRAFT.deadline and call["JobIN"]["resourceID"] == 0
+
+
+def test_download_job_output_reads_file_content():
+    gw, soap = gateway({
+        ("DataDocument30", "getFileList"): ok(["\\p433.fr.xlf"]),
+        ("DataDocument30", "download_Document"): SimpleNamespace(statusCode=0, statusMessage="OK", fileContent=b"<xliff/>"),
+    })
+    assert gw.list_job_output(ProjectType.ORDER, 88213) == ["\\p433.fr.xlf"]
+    assert gw.download_job_output(ProjectType.ORDER, 88213, "\\p433.fr.xlf") == b"<xliff/>"
+    assert soap.kwargs("DataDocument30", "download_Document")["FolderType"] == 23
 
 
 def test_transport_failure_is_a_technical_error():
@@ -223,6 +244,13 @@ CALLS = [
     ("set_item_status", (ProjectType.ORDER, 5105, ItemStatus.DELIVERED)),
     ("upload_document", (ProjectType.ORDER, 5105, "a.xlf", b"<xliff/>")),
     ("create_job", (ProjectType.ORDER, 414, 5105, "TRA")),
+    ("create_job", (ProjectType.ORDER, 414, 5105, "REV", DRAFT.deadline, DRAFT.deadline)),
+    ("get_order_number", (414,)),
+    ("get_resource", (21,)),
+    ("list_items", (ProjectType.ORDER, 414)),
+    ("list_item_files", (ProjectType.ORDER, 5105)),
+    ("list_job_output", (ProjectType.ORDER, 88213)),
+    ("download_job_output", (ProjectType.ORDER, 88213, "p433.fr.xlf")),
     ("get_job", (ProjectType.ORDER, 88213)),
     ("list_item_jobs", (ProjectType.ORDER, 5105)),
     ("set_job_status", (ProjectType.ORDER, 88213, JobStatus.CANCELED)),
@@ -240,7 +268,11 @@ def test_every_call_matches_the_wsdl(method, args):
         ("DataQuote30", "getStatus"): ok(7),
         ("DataQuote30", "getQuoteObject"): ok(SimpleNamespace(quoteID=77, orderID=[])),
         ("DataItem30", "insert2"): ok(5105),
-        ("DataJob30", "insert2"): ok(88213),
+        ("DataItem30", "addLanguageCombination"): ok(38878),
+        ("DataJob30", "insert3"): ok(88213),
+        ("DataResource30", "getResourceObject"): ok(SimpleNamespace(resourceID=21, fullName="A. Laurent", name1=None, name2=None, email=None)),
+        ("DataItem30", "getAllItemObjects"): ok([SimpleNamespace(itemID=5105, briefDescription="P01", reference="FOX-P1", sourceLanguage="English", targetLanguage="French", status=8)]),
+        ("DataDocument30", "download_Document"): SimpleNamespace(statusCode=0, statusMessage="OK", fileContent=b"<xliff/>", fileSize=8, filename="p433.fr.xlf"),
         ("DataJob30", "getJob_ForView"): ok(job_row()),
         ("DataJob30", "getJobListOfItem_ForView"): ok([job_row()]),
     })

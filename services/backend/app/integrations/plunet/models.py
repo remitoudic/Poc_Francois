@@ -26,7 +26,10 @@ class PlunetLanguage(BaseModel):
 
 
 class ProjectDraft(BaseModel):
-    """Input for an order (Auftrag) or a quote (Angebot)."""
+    """Input for an order (Auftrag) or a quote (Angebot).
+
+    The FOX Plunet requires a project manager on orders (error 3033 otherwise).
+    """
 
     project_name: str
     customer_id: int
@@ -44,7 +47,11 @@ class CreatedProject(BaseModel):
 
 
 class ItemDraft(BaseModel):
-    """One Plunet item per FOX MLO position: 1 post × 1 target language."""
+    """One Plunet item per FOX MLO position: 1 post × 1 target language.
+
+    Plunet keeps `description` but drops `reference`, so FOX MLO puts its position tag
+    (`FOX-P<position id>`) in the description to find the item again after a quote is converted.
+    """
 
     project_type: ProjectType
     project_id: int
@@ -53,6 +60,17 @@ class ItemDraft(BaseModel):
     target_lang: str
     deadline: datetime | None = None
     reference: str | None = None
+
+
+class PlunetItem(BaseModel):
+    id: int
+    project_type: ProjectType
+    project_id: int
+    description: str | None = None
+    reference: str | None = None
+    source_lang: str | None = None  # Plunet language name
+    target_lang: str | None = None
+    status: int | None = None
 
 
 class PlunetJob(BaseModel):

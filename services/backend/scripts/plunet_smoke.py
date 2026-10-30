@@ -78,16 +78,24 @@ def main() -> int:
 
         item_id = gw.create_item(ItemDraft(
             project_type=ProjectType.ORDER, project_id=order.id, description="P01 · smoke",
-            source_lang="en", target_lang="fr", deadline=draft.deadline,
+            source_lang="en", target_lang="fr", deadline=draft.deadline, reference=f"FOX-SMOKE-P1-{stamp}",
         ))
         step("item", item_id)
         gw.upload_document(ProjectType.ORDER, item_id, "fox-mlo-smoke.en-fr.xlf", XLIFF)
-        step("document uploaded to item source folder")
+        step("document uploaded to item source folder", gw.list_item_files(ProjectType.ORDER, item_id))
+        items = gw.list_items(ProjectType.ORDER, order.id)
+        step("items of order", [(i.id, i.reference, i.source_lang, i.target_lang) for i in items])
+        step("order number", gw.get_order_number(order.id))
 
-        job_id = gw.create_job(ProjectType.ORDER, order.id, item_id, args.job_type)
+        job_id = gw.create_job(
+            ProjectType.ORDER, order.id, item_id, args.job_type,
+            start_date=datetime.now(UTC), due_date=draft.deadline,
+        )
         job = gw.get_job(ProjectType.ORDER, job_id)
         step("job", f"{job_id} {job.job_type} {job.status} → {task_status_from_plunet(job.status)}")
+        step("job dates", f"start {job.start_date} due {job.due_date}")
         step("job cost", gw.get_job_cost(ProjectType.ORDER, job_id))
+        step("job output files", gw.list_job_output(ProjectType.ORDER, job_id))
 
         gw.set_job_status(ProjectType.ORDER, job_id, JobStatus.CANCELED)
         job = gw.get_job(ProjectType.ORDER, job_id)

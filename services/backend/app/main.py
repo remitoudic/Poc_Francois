@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.realtime.broadcaster import broadcaster
 from app.realtime.listener import EventListener
-from app.routers import etl, events, health, plunet, system, xliff
+from app.routers import dev, etl, events, health, plunet, system, xliff
 
 settings = get_settings()
 
@@ -46,6 +46,8 @@ api_v1.include_router(xliff.router)
 api_v1.include_router(plunet.router)
 api_v1.include_router(events.router)
 api_v1.include_router(system.router)
+if settings.DEV_ENDPOINTS:
+    api_v1.include_router(dev.router)
 
 app.mount("/api/v1", api_v1)
 

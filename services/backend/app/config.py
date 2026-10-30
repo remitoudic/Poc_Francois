@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     TEMPORAL_NAMESPACE: str = "fox-mlo"
     TEMPORAL_TASK_QUEUE: str = "fox-orchestration"
     TEMPORAL_PLUNET_TASK_QUEUE: str = "fox-plunet"
+    PLUNET_MAX_CONCURRENT_CALLS: int = 4  # fox-plunet activities run at most this many at once
+    PLUNET_SYNC_SECONDS: int = 120  # PlunetSyncWorkflow schedule interval (decision 1)
+    DEV_ENDPOINTS: bool = False  # /api/v1/dev/* (create orders, drive the fake Plunet); never in production
 
     # Polylang (WordPress) source
     POLYLANG_BASE_URL: str = "http://polylang-mock:8090"

@@ -10,12 +10,12 @@ Target design: [`backend-architecture.md`](backend-architecture.md). UX source: 
 | 1 — Infrastructure | **Done** | `temporal-setup` → `temporal` 1.32.1 → `temporal-namespace` (`fox-mlo`, 720 h); `temporal-ui` 2.57.0 on 127.0.0.1:8088; `worker`; `polylang-mock`; `backend` renamed to `api`. The setup job creates the Temporal databases itself, so `init.sql` is unchanged. |
 | 2 — Data model + realtime | **Done** | Migration `0002`: v2 tables, seeded templates, `events` + `notify_event()` trigger. One LISTEN connection per api process → broadcaster → `GET /api/v1/events/stream` (SSE, scopes, `Last-Event-ID` replay, heartbeat, `resync`). Verified end to end: `POST /api/v1/system/check-workflow` → Temporal → worker activity → `events` → NOTIFY → SSE; a rolled-back insert is never delivered. |
 | 3 — Integrations | **Done** (branch `feat/backend-phase3-integrations`); smoke test passed on the live portal | Plunet SOAP gateway + in-memory fake, Polylang connector, XLIFF parser and QA rules, WSDL-validated tests. See Phase 3 below. |
-| 4 — Workflows | Planned | |
+| 4 — Workflows | **Done** (branch `feat/backend-phase4-workflows`); end to end in Docker with the fake Plunet | `OrderWorkflow`, `PositionWorkflow`, `PlunetSyncWorkflow` (Schedule), activities on two task queues, dev endpoints. See Phase 4 below. |
 | 5 — API v2 | Planned | |
 | 6 — Frontend | In progress | New UI built against a mock API (`VITE_API_MODE`, default `mock`); contract in `services/frontend/src/api/types.ts`. Wiring to real endpoints follows phases 3–5. v1 dashboard moved to `/legacy`. |
 | 7 — Hardening | Planned | |
 
-Tests: `cd services/backend && uv run python -m pytest` (90 tests: status mapping, broadcaster, Temporal workflow in the time-skipping test server, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA).
+Tests: `cd services/backend && uv run python -m pytest` (116 tests: status mapping, broadcaster, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA, workflows in the time-skipping test server, replay of saved histories).
 
 Each phase ends in a working, testable system and can be merged on its own. Phases 1–3 can partly run in parallel.
 
@@ -143,7 +143,7 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 - Items have no language fields on creation; the gateway adds the language pair with `DataItem30.addLanguageCombination` right after `insert2`.
 - Plunet expects its own **language names** ("English", "French"), not codes. The gateway reads the active languages (`DataAdmin30.getAvailableLanguages`) and resolves a Polylang code or locale: exact locale first (`fr_CA` → "French (Canada)"), else the generic language (`de-at` → "German"; there is no German (Austria) on the FOX instance). An unknown language fails before anything is written.
 - A quote accepts a PM and new items only while it is `NEW` / `IN_PREPARATION`. `create_quote` leaves it `IN_PREPARATION`; Phase 4 adds items and documents, then releases it with `PENDING`. If setting the PM fails, the quote is deleted.
-- Job type `TRA` exists on the FOX instance. Job prices come in the project currency (CAD for the test customer).
+- Job types on the FOX instance are `PRM` (project management), `TRA` and `REV`; there is no `PM`. Jobs are created with `insert3` (start and due date). Job prices come in the project currency (CAD for the test customer).
 - `OrderIN` requires `rate`, `customerContactID` and `orderID`; `ItemIN` requires `status`, `taxType` and `totalPrice`. The gateway sends neutral defaults.
 
 **Done when:** unit tests cover the gateway with fakes, and one manual smoke script creates and cancels a test order on the real Plunet.
@@ -154,35 +154,32 @@ The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is remo
 
 **Goal:** an order runs from creation to delivery and can be controlled.
 
-- [ ] Activities (`activities/`), all idempotent:
-  - `projection.record_task_state`, `projection.record_event`, `projection.set_order_status`
-  - `plunet.create_order|create_quote|accept_quote|await_quote_conversion|create_item|create_job|cancel_jobs|upload_document` (queue `fox-plunet`)
-  - `polylang.fetch_xliff`, `polylang.publish_translation`
-  - `xliff.parse_and_store`, `qa.run_checks`, `deliver.to_endpoint`
-- [ ] Retry policies: technical errors use 5 attempts, exponential backoff up to 5 min. `BusinessError` is listed in `non_retryable_error_types`.
-- [ ] `PositionWorkflow` (architecture §5.2–5.4):
-  - task loop with cursor; per-task handlers (automatic vs human Plunet task)
-  - updates with validators: `pause`, `resume`, `retry`, `restart_from`, `cancel`
-  - signal `plunet_job_status(job_id, status)`; overdue timer, which emits a WARN event
-  - query `state` (for debugging and for the api if the projection lags)
-  - cancellation: cancel running activity handles, run `cancel_jobs` in a non-cancellable scope, then record `CANCELLED`
-- [ ] `OrderWorkflow`: create in Plunet → if quote, `wait_condition(accepted or rejected)` → start child `PositionWorkflow`s (`parent_close_policy=REQUEST_CANCEL`) → compute order status as children report.
-- [ ] `PlunetSyncWorkflow` as a **Temporal Schedule** (every 2 min, overlap policy `SKIP`): the **only** sync path from Plunet (decision 1). Reads open jobs and quotes from the DB, asks Plunet for status, assignee and prices, and signals workflows on change. No callbacks.
-- [ ] Job creation defaults (decision 7): due date = position deadline (else order deadline), start date = now, no resource (the PM assigns in Plunet, or FOX MLO assigns through `assign_resource`), price lines left to Plunet's price list for the customer.
-- [ ] Every FOX MLO action that changes a job (cancel, restart, assign) calls Plunet **first** and updates the local state only after Plunet confirms.
-- [ ] `worker.py`: registers workflows and activities on both task queues; graceful shutdown.
+- [x] Activities (`app/activities/`), all idempotent (each creation checks the id stored in the DB first and saves the new Plunet id in the same activity):
+  - `projection.py` (queue `fox-orchestration`): `load_order`, `load_position`, `record_task` (task + position + recomputed order status + event in one transaction), `reset_tasks`, `close_position`, `update_order`, `set_position_workflow`, `collect_sync_targets`
+  - `content.py`: `import_xliff` (Polylang → parse → segments), `run_qa`, `deliver` (Polylang / endpoint / none)
+  - `plunet.py` (queue `fox-plunet`, sync zeep calls on a thread pool, `PLUNET_MAX_CONCURRENT_CALLS`): `plunet_create_project`, `plunet_set_quote_status`, `plunet_adopt_order`, `plunet_create_item`, `plunet_upload_source`, `plunet_set_item_status`, `plunet_create_job`, `plunet_job_outcome`, `plunet_cancel_job`, `plunet_cancel_position`, `plunet_fetch_translation`, `plunet_poll`; `dev_*` helpers for the fake Plunet
+- [x] Retry policy `RETRY`: 5 attempts, backoff ×2 up to 5 min. `BusinessError` becomes a non-retryable `ApplicationError(type="BusinessError")` (`activities/common.py`).
+- [x] `PositionWorkflow`: task loop with cursor; IMPORT / Plunet job (PM, TRA, REV) / QA / DELIVER handlers. A failed task waits for a person (`retry`, `restart_from` or `cancel`).
+  - updates with validators: `pause`, `resume`, `retry` (only on a failed task), `restart_from(seq ≤ cursor)`, `cancel` (reason required)
+  - signal `plunet_job_status`; overdue timer up to the order deadline emits one WARN event
+  - query `state`
+  - cancel: Plunet first (open jobs and the item → `CANCELED`), then `CANCELLED` locally. If the Plunet cleanup fails, the cancellation still stands and a WARN event asks for a manual check.
+  - retry and restart of a Plunet task create a **new** job; restart cancels the open job in Plunet first.
+- [x] `OrderWorkflow`: create in Plunet. Quote: create items, upload the .xliff, release to `PENDING`, wait. Accepted in FOX MLO → `ACCEPTED` in Plunet, then wait for the PM's conversion; converted → `plunet_adopt_order` matches the order items to positions by the `FOX-P{id}` tag. Then child `PositionWorkflow`s `position-{id}` (`REQUEST_CANCEL`). Signals are idempotent.
+- [x] `PlunetSyncWorkflow` as the Schedule `plunet-sync` (every `PLUNET_SYNC_SECONDS`, overlap `SKIP`): reads open jobs and quotes awaiting acceptance, asks Plunet, signals the workflows that changed. Missing workflows are skipped.
+- [x] Job creation defaults (decision 7): due date = order deadline, start date = now, no resource, prices from Plunet's price list.
+- [x] `worker.py`: two workers (`fox-orchestration`, `fox-plunet`), creates or updates the sync schedule, graceful shutdown on SIGINT/SIGTERM.
+- [x] Dev endpoints (`DEV_ENDPOINTS=true`, `app/routers/dev.py`): `POST /dev/orders`, `/dev/orders/{id}/accept|reject`, `/dev/positions/{id}/{pause|resume|retry|cancel|restart}`, `GET /dev/positions/{id}/state`; with `PLUNET_MODE=fake` also `/dev/plunet/jobs/{job_id}/status`, `/dev/plunet/quotes/{order_id}/convert`, `/dev/plunet/sync`.
 
-**Tests:** use the Temporal **time-skipping test environment** (`WorkflowEnvironment.start_time_skipping()`) with mocked activities:
-- happy path through all 6 tasks
-- QA fails → retry → completes
-- pause during TRA → no new task starts → resume
-- restart from REV resets later tasks
-- cancel with reason → `cancel_jobs` called → status `CANCELLED`
-- quote waits; `quote_accepted` sent twice → positions start only once
-- invalid update (resume while running) → rejected
-- replay test against saved histories (protects determinism on future changes)
+**Tests** (`tests/test_workflows.py`, fakes in `tests/workflow_fakes.py`, time-skipping server): happy path through 6 tasks; QA fail → retry; pause during TRA → resume; restart from REV; restart while a job is open cancels it in Plunet; cancel with reason and the reason-required rejection; cancel when the Plunet cleanup fails; invalid updates rejected; job cancelled in Plunet → FAILED → retry with a new job; overdue WARN once; quote accepted twice → `ACCEPTED` once, converted → positions start; quote rejected in Plunet; direct order; sync signals and missing workflows. The happy-path history is replayed in the test and saved in `tests/fixtures/histories/`; `FOX_WRITE_HISTORIES=1` refreshes it after an intended change.
 
-**Done when:** in Docker, creating an order with 2 positions runs to `COMPLETED` with mocked human tasks (a dev endpoint to force the Plunet job status), and every step is visible in Temporal UI and in the `events` table.
+**Verified in Docker (2026-10-30)** with `PLUNET_MODE=fake DEV_ENDPOINTS=true PLUNET_SYNC_SECONDS=15`: an order with 2 positions (standard template, fr and de-at) ran to `COMPLETED`, each job change travelling fake Plunet → sync → signal (≈2 s with the schedule triggered); a quote went through accept → convert → `COMPLETED`. Every step is in the `events` table and in Temporal UI.
+
+**Findings:**
+- The fake Plunet lives in the worker's memory: restarting the worker forgets its objects while the database keeps their ids. Start new dev orders after a restart.
+- The translated file is read from the last delivered job's OUT folder (`ORDER_JOB_OUT`); QA runs on that file.
+
+**Done when:** in Docker, creating an order with 2 positions runs to `COMPLETED` with mocked human tasks (a dev endpoint to force the Plunet job status), and every step is visible in Temporal UI and in the `events` table. ✔
 
 ---
 

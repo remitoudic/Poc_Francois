@@ -29,3 +29,11 @@ Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/doc
 ## Plunet BusinessManager (`/api/v1/plunet`)
 * `GET /api/v1/plunet/status`: Returns the live Plunet version from `portal.foxtranslations.com`.
 * `POST /api/v1/plunet/test-login`: Logs in with the configured credentials and returns a session UUID.
+
+## Dev (`/api/v1/dev`, only with `DEV_ENDPOINTS=true`)
+Temporary until the v2 API (phase 5). Never enabled in production.
+* `POST /api/v1/dev/orders`: Creates an order or quote (`kind`, `template`, `positions[]` with `post_id`, `title`, `target_lang`) and starts its `OrderWorkflow`.
+* `POST /api/v1/dev/orders/{order_id}/accept` · `/reject`: Accepts or rejects a quote (body: `actor`, `reason`).
+* `POST /api/v1/dev/positions/{position_id}/{action}`: `pause`, `resume`, `retry`, `cancel` (reason required) or `restart` (body: `seq`). Returns 409 with the reason when the workflow refuses.
+* `GET /api/v1/dev/positions/{position_id}/state`: The workflow's own view of the position.
+* With `PLUNET_MODE=fake` only: `POST /api/v1/dev/plunet/jobs/{job_id}/status` (body: `status`, `resource_plunet_id`), `POST /api/v1/dev/plunet/quotes/{order_id}/convert`, `POST /api/v1/dev/plunet/sync`. Each change goes into the fake Plunet and reaches the workflow through the sync, as in production.

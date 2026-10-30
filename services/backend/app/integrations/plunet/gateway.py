@@ -28,12 +28,14 @@ from app.integrations.plunet.enums import (
     ResourceStatus,
     WorkingStatus,
     item_source_folder,
+    job_out_folder,
 )
 from app.integrations.plunet.models import (
     CreatedProject,
     ItemDraft,
     Money,
     PlunetCustomer,
+    PlunetItem,
     PlunetJob,
     PlunetLanguage,
     PlunetResource,
@@ -79,12 +81,21 @@ class PlunetGateway(Protocol):
     def get_quote_status(self, quote_id: int) -> QuoteStatus: ...
     def set_quote_status(self, quote_id: int, status: QuoteStatus) -> None: ...
     def get_order_id_for_quote(self, quote_id: int) -> int | None: ...
+    def get_order_number(self, order_id: int) -> str: ...
+    def get_resource(self, resource_id: int) -> PlunetResource: ...
     def delete_order(self, order_id: int) -> None: ...
     def delete_quote(self, quote_id: int) -> None: ...
     def create_item(self, draft: ItemDraft) -> int: ...
+    def list_items(self, project_type: ProjectType, project_id: int) -> list[PlunetItem]: ...
+    def list_item_files(self, project_type: ProjectType, item_id: int) -> list[str]: ...
     def set_item_status(self, project_type: ProjectType, item_id: int, status: ItemStatus) -> None: ...
     def upload_document(self, project_type: ProjectType, item_id: int, file_name: str, content: bytes) -> None: ...
-    def create_job(self, project_type: ProjectType, project_id: int, item_id: int, job_type: str) -> int: ...
+    def create_job(
+        self, project_type: ProjectType, project_id: int, item_id: int, job_type: str,
+        start_date: datetime | None = None, due_date: datetime | None = None,
+    ) -> int: ...
+    def list_job_output(self, project_type: ProjectType, job_id: int) -> list[str]: ...
+    def download_job_output(self, project_type: ProjectType, job_id: int, path: str) -> bytes: ...
     def get_job(self, project_type: ProjectType, job_id: int) -> PlunetJob: ...
     def list_item_jobs(self, project_type: ProjectType, item_id: int) -> list[PlunetJob]: ...
     def set_job_status(self, project_type: ProjectType, job_id: int, status: JobStatus) -> None: ...
@@ -191,14 +202,15 @@ class SoapPlunetGateway:
         except Exception as exc:  # zeep Fault, TransportError, requests errors, timeouts
             raise PlunetTechnicalError(f"Plunet {service}.{operation}: {exc}") from exc
 
-    def _call(self, service: str, operation: str, **kwargs: Any) -> Any:
-        """Authenticated call returning `data`. Logs in again once if the session expired."""
+    def _call(self, service: str, operation: str, *, whole: bool = False, **kwargs: Any) -> Any:
+        """Authenticated call returning `data` (or the whole result object with `whole=True`).
+        Logs in again once if the session expired."""
         for attempt in (1, 2):
             uuid = self._login()
             result = self._raw(service, operation, UUID=uuid, **kwargs)
             status = getattr(result, "statusCode", 0)
             if status == 0:
-                return getattr(result, "data", None)
+                return result if whole else getattr(result, "data", None)
             message = str(getattr(result, "statusMessage", "") or "")
             if attempt == 1 and _SESSION_ERROR.search(message):
                 logger.info("Plunet session expired; logging in again")
@@ -281,8 +293,7 @@ class SoapPlunetGateway:
             "rate": 1.0,
         }
         order_id = int(self._call("DataOrder30", "insert2", OrderIN=order_in))
-        number = self._call("DataOrder30", "getOrderNo_for_View", orderID=order_id)
-        return CreatedProject(project_type=ProjectType.ORDER, id=order_id, number=str(number or order_id))
+        return CreatedProject(project_type=ProjectType.ORDER, id=order_id, number=self.get_order_number(order_id))
 
     def create_quote(self, draft: ProjectDraft) -> CreatedProject:
         """Create the quote IN_PREPARATION and set its PM.
@@ -332,6 +343,17 @@ class SoapPlunetGateway:
         order_ids = [i for i in (getattr(quote, "orderID", None) or []) if _int_or_none(i)]
         return int(order_ids[0]) if order_ids else None
 
+    def get_order_number(self, order_id: int) -> str:
+        return str(self._call("DataOrder30", "getOrderNo_for_View", orderID=order_id) or order_id)
+
+    def get_resource(self, resource_id: int) -> PlunetResource:
+        r = self._call("DataResource30", "getResourceObject", resourceID=resource_id)
+        return PlunetResource(
+            id=r.resourceID,
+            name=r.fullName or " ".join(filter(None, [r.name2, r.name1])) or f"#{r.resourceID}",
+            email=r.email or None,
+        )
+
     def delete_order(self, order_id: int) -> None:
         """Remove an order with its items and jobs (rollback of a creation that failed halfway)."""
         self._call("DataOrder30", "delete", orderID=order_id)
@@ -357,7 +379,9 @@ class SoapPlunetGateway:
             "totalPrice": 0.0,
         }
         item_id = int(self._call("DataItem30", "insert2", ItemIN=item_in))
-        self._call(
+        # addLanguageCombination only registers the pair on the project; it must then be
+        # attached to the item (verified on the live portal).
+        combination_id = self._call(
             "DataItem30",
             "addLanguageCombination",
             sourceLanguage=source_lang,
@@ -366,7 +390,35 @@ class SoapPlunetGateway:
             projectID=draft.project_id,
             itemID=item_id,
         )
+        self._call(
+            "DataItem30",
+            "setLanguageCombinationID",
+            languageCombinationID=int(combination_id),
+            projectType=draft.project_type,
+            itemID=item_id,
+        )
         return item_id
+
+    def list_items(self, project_type: ProjectType, project_id: int) -> list[PlunetItem]:
+        rows = self._call("DataItem30", "getAllItemObjects", projectID=project_id, projectType=project_type) or []
+        return [
+            PlunetItem(
+                id=r.itemID,
+                project_type=project_type,
+                project_id=project_id,
+                description=r.briefDescription or None,
+                reference=r.reference or None,
+                source_lang=r.sourceLanguage or None,
+                target_lang=r.targetLanguage or None,
+                status=r.status,
+            )
+            for r in rows
+        ]
+
+    def list_item_files(self, project_type: ProjectType, item_id: int) -> list[str]:
+        """Files in the item's source folder (used to make uploads idempotent)."""
+        rows = self._call("DataDocument30", "getFileList", MainID=item_id, FolderType=item_source_folder(project_type))
+        return [str(r) for r in rows or []]
 
     def set_item_status(self, project_type: ProjectType, item_id: int, status: ItemStatus) -> None:
         self._call("DataItem30", "setStatus", status=status, projectType=project_type, itemID=item_id)
@@ -385,17 +437,35 @@ class SoapPlunetGateway:
 
     # --- Jobs -----------------------------------------------------------------------------
 
-    def create_job(self, project_type: ProjectType, project_id: int, item_id: int, job_type: str) -> int:
-        return int(
-            self._call(
-                "DataJob30",
-                "insert2",
-                projectID=project_id,
-                projectType=project_type,
-                jobTypeAbbrevation=job_type,  # Plunet's spelling
-                itemID=item_id,
-            )
+    def create_job(
+        self, project_type: ProjectType, project_id: int, item_id: int, job_type: str,
+        start_date: datetime | None = None, due_date: datetime | None = None,
+    ) -> int:
+        """Create a job on the item with its dates (decision 7: no resource; the PM assigns it)."""
+        job_in = {
+            "jobID": 0,
+            "projectID": project_id,
+            "projectType": project_type,
+            "itemID": item_id,
+            "resourceID": 0,
+            "contactPersonID": 0,
+            "status": JobStatus.IN_PREPERATION,
+            "startDate": start_date,
+            "dueDate": due_date,
+        }
+        return int(self._call("DataJob30", "insert3", JobIN=job_in, JobTypeShort=job_type))
+
+    def list_job_output(self, project_type: ProjectType, job_id: int) -> list[str]:
+        """Files the resource delivered (job OUT folder)."""
+        rows = self._call("DataDocument30", "getFileList", MainID=job_id, FolderType=job_out_folder(project_type))
+        return [str(r) for r in rows or []]
+
+    def download_job_output(self, project_type: ProjectType, job_id: int, path: str) -> bytes:
+        result = self._call(
+            "DataDocument30", "download_Document", whole=True,
+            MainID=job_id, FolderType=job_out_folder(project_type), FilePathName=path,
         )
+        return bytes(result.fileContent or b"")
 
     @staticmethod
     def _job(raw: Any, project_type: ProjectType) -> PlunetJob:
