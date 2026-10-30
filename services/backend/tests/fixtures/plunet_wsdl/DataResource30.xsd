@@ -1,0 +1,239 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by XML-WS Runtime (https://github.com/eclipse-ee4j/metro-jax-ws). Runtime's version is XML-WS Runtime 4.0.2 git-revision#0264419. --><xs:schema xmlns:tns="http://API.Integration/" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://API.Integration/">
+
+<xs:complexType name="Result">
+<xs:sequence>
+<xs:element name="statusCode" type="xs:int"/>
+<xs:element name="statusCodeAlphanumeric" type="xs:string" minOccurs="0"/>
+<xs:element name="statusMessage" type="xs:string" minOccurs="0"/>
+<xs:element name="warning_StatusCodeList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="IntegerList">
+<xs:sequence>
+<xs:element name="integerList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="ResourceListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Resource" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Resource">
+<xs:sequence>
+<xs:element name="academicTitle" type="xs:string" minOccurs="0"/>
+<xs:element name="costCenter" type="xs:string" minOccurs="0"/>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="email" type="xs:string" minOccurs="0"/>
+<xs:element name="externalID" type="xs:string" minOccurs="0"/>
+<xs:element name="fax" type="xs:string" minOccurs="0"/>
+<xs:element name="formOfAddress" type="xs:int"/>
+<xs:element name="fullName" type="xs:string" minOccurs="0"/>
+<xs:element name="mobilePhone" type="xs:string" minOccurs="0"/>
+<xs:element name="name1" type="xs:string" minOccurs="0"/>
+<xs:element name="name2" type="xs:string" minOccurs="0"/>
+<xs:element name="opening" type="xs:string" minOccurs="0"/>
+<xs:element name="phone" type="xs:string" minOccurs="0"/>
+<xs:element name="resourceID" type="xs:int"/>
+<xs:element name="resourceType" type="xs:int"/>
+<xs:element name="skypeID" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:int"/>
+<xs:element name="supervisor1" type="xs:string" minOccurs="0"/>
+<xs:element name="supervisor2" type="xs:string" minOccurs="0"/>
+<xs:element name="userId" type="xs:int"/>
+<xs:element name="website" type="xs:string" minOccurs="0"/>
+<xs:element name="workingStatus" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="IntegerResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:int"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="ResourceResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Resource" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="IntegerArrayResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="SearchFilter_Resource">
+<xs:sequence>
+<xs:element name="contact_resourceID" type="xs:int" default="-1"/>
+<xs:element name="email" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="languageCode" type="xs:string" default="EN"/>
+<xs:element name="name1" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="name2" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="propertiesList" type="tns:Property" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="resourceType" type="xs:int" default="-1"/>
+<xs:element name="resourceStatus" type="xs:int" default="-1"/>
+<xs:element name="sourceLanguageCode" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="targetLanguageCode" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="textmodulesList" type="tns:Textmodule" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="workingStatus" type="xs:int" default="-1"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="Property">
+<xs:sequence>
+<xs:element name="avaliablePropertyValueIDList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="mainPropertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyType" type="xs:int"/>
+<xs:element name="selectedPropertyValueID" type="xs:int"/>
+<xs:element name="selectedPropertyValueList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="Textmodule">
+<xs:sequence>
+<xs:element name="availableValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="customerSpecific" type="xs:boolean"/>
+<xs:element name="dateValue" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="flag" type="xs:string" minOccurs="0"/>
+<xs:element name="flag_MainTextModule" type="xs:string" minOccurs="0"/>
+<xs:element name="jobTypeSpecific" type="xs:boolean"/>
+<xs:element name="selectedValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="stringValue" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleLabel" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleType" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="AccountResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Account" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Account">
+<xs:sequence>
+<xs:element name="accountDescription" type="xs:string" minOccurs="0"/>
+<xs:element name="accountID" type="xs:int"/>
+<xs:element name="accountNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="accountType" type="xs:int"/>
+<xs:element name="active" type="xs:boolean"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PricelistListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Pricelist" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Pricelist">
+<xs:sequence>
+<xs:element name="ResourcePricelistID" type="xs:int"/>
+<xs:element name="pricelistID" type="xs:int"/>
+<xs:element name="PricelistNameEN" type="xs:string" minOccurs="0"/>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="withWhiteSpace" type="xs:boolean"/>
+<xs:element name="adminPriceListId" type="xs:int"/>
+<xs:element name="adminPriceListPartnerType" type="tns:contactType" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="ResourceIN">
+<xs:sequence>
+<xs:element name="academicTitle" type="xs:string" minOccurs="0"/>
+<xs:element name="costCenter" type="xs:string" minOccurs="0"/>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="email" type="xs:string" minOccurs="0"/>
+<xs:element name="externalID" type="xs:string" minOccurs="0"/>
+<xs:element name="fax" type="xs:string" minOccurs="0"/>
+<xs:element name="formOfAddress" type="xs:int"/>
+<xs:element name="fullName" type="xs:string" minOccurs="0"/>
+<xs:element name="mobilePhone" type="xs:string" minOccurs="0"/>
+<xs:element name="name1" type="xs:string" minOccurs="0"/>
+<xs:element name="name2" type="xs:string" minOccurs="0"/>
+<xs:element name="opening" type="xs:string" minOccurs="0"/>
+<xs:element name="phone" type="xs:string" minOccurs="0"/>
+<xs:element name="resourceID" type="xs:int"/>
+<xs:element name="resourceType" type="xs:int"/>
+<xs:element name="skypeID" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:int"/>
+<xs:element name="supervisor1" type="xs:string" minOccurs="0"/>
+<xs:element name="supervisor2" type="xs:string" minOccurs="0"/>
+<xs:element name="userId" type="xs:int"/>
+<xs:element name="website" type="xs:string" minOccurs="0"/>
+<xs:element name="workingStatus" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PaymentInfoResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PaymentInfo" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PaymentInfo">
+<xs:sequence>
+<xs:element name="accountHolder" type="xs:string" minOccurs="0"/>
+<xs:element name="accountID" type="xs:int"/>
+<xs:element name="BIC" type="xs:string" minOccurs="0"/>
+<xs:element name="contractNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="debitAccount" type="xs:string" minOccurs="0"/>
+<xs:element name="IBAN" type="xs:string" minOccurs="0"/>
+<xs:element name="paymentMethodID" type="xs:int"/>
+<xs:element name="preselectedTaxID" type="xs:int"/>
+<xs:element name="salesTaxID" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:simpleType name="contactType">
+<xs:restriction base="xs:string">
+<xs:enumeration value="CUSTOMER"/>
+<xs:enumeration value="RESOURCE"/>
+<xs:enumeration value="MISCELLANEOUS"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:schema>

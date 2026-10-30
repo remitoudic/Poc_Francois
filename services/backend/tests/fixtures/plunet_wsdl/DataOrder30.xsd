@@ -1,0 +1,241 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by XML-WS Runtime (https://github.com/eclipse-ee4j/metro-jax-ws). Runtime's version is XML-WS Runtime 4.0.2 git-revision#0264419. --><xs:schema xmlns:tns="http://API.Integration/" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://API.Integration/">
+
+<xs:complexType name="Result">
+<xs:sequence>
+<xs:element name="statusCode" type="xs:int"/>
+<xs:element name="statusCodeAlphanumeric" type="xs:string" minOccurs="0"/>
+<xs:element name="statusMessage" type="xs:string" minOccurs="0"/>
+<xs:element name="warning_StatusCodeList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="OrderResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Order" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Order">
+<xs:sequence>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="customerContactID" type="xs:int"/>
+<xs:element name="customerID" type="xs:int"/>
+<xs:element name="deliveryDeadline" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="orderClosingDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="orderDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="orderDisplayName" type="xs:string" minOccurs="0"/>
+<xs:element name="orderID" type="xs:int"/>
+<xs:element name="projectManagerID" type="xs:int"/>
+<xs:element name="projectName" type="xs:string" minOccurs="0"/>
+<xs:element name="rate" type="xs:double"/>
+<xs:element name="requestID" type="xs:int"/>
+<xs:element name="subject" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="OrderIN">
+<xs:sequence>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="customerContactID" type="xs:int"/>
+<xs:element name="customerID" type="xs:int"/>
+<xs:element name="deliveryDeadline" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="orderDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="orderID" type="xs:int"/>
+<xs:element name="projectManagerID" type="xs:int"/>
+<xs:element name="projectManagerMemo" type="xs:string" minOccurs="0"/>
+<xs:element name="projectName" type="xs:string" minOccurs="0"/>
+<xs:element name="rate" type="xs:double"/>
+<xs:element name="referenceNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="subject" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="IntegerResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:int"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="DateResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:dateTime" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="BooleanResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:boolean"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="StringArrayResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="LinkListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Link" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Link">
+<xs:sequence>
+<xs:element name="linkId" type="xs:int"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="projectType" type="xs:int"/>
+<xs:element name="sourceOrderId" type="xs:int"/>
+<xs:element name="targetOrderId" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="DoubleResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:double"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="SearchFilter_Order">
+<xs:sequence>
+<xs:element name="customerID" type="xs:int" default="-1"/>
+<xs:element name="itemStatus" type="xs:int" default="-1" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="languageCode" type="xs:string" default="EN"/>
+<xs:element name="orderStatus" type="xs:int" default="-1"/>
+<xs:element name="projectDescription" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="projectName" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="projectType" type="xs:int" default="1"/>
+<xs:element name="propertiesList" type="tns:Property" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="sourceLanguage" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="statusProjectFileArchiving" type="xs:int" default="-1"/>
+<xs:element name="targetLanguage" type="xs:string" default="" minOccurs="0"/>
+<xs:element name="teamMember" type="tns:SelectionEntry_TeamMember" minOccurs="0"/>
+<xs:element name="textmodulesList" type="tns:Textmodule" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="timeFrame" type="tns:SelectionEntry_TimeFrame" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="Property">
+<xs:sequence>
+<xs:element name="avaliablePropertyValueIDList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="mainPropertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyType" type="xs:int"/>
+<xs:element name="selectedPropertyValueID" type="xs:int"/>
+<xs:element name="selectedPropertyValueList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="SelectionEntry_TeamMember">
+<xs:sequence>
+<xs:element name="ID" type="xs:int"/>
+<xs:element name="teamMember" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="Textmodule">
+<xs:sequence>
+<xs:element name="availableValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="customerSpecific" type="xs:boolean"/>
+<xs:element name="dateValue" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="flag" type="xs:string" minOccurs="0"/>
+<xs:element name="flag_MainTextModule" type="xs:string" minOccurs="0"/>
+<xs:element name="jobTypeSpecific" type="xs:boolean"/>
+<xs:element name="selectedValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="stringValue" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleLabel" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleType" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="SelectionEntry_TimeFrame">
+<xs:sequence>
+<xs:element name="dateFrom" type="xs:dateTime"/>
+<xs:element name="dateRelation" type="xs:int"/>
+<xs:element name="dateTo" type="xs:dateTime"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="IntegerArrayResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="TemplateListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Template" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Template">
+<xs:sequence>
+<xs:element name="customerID" type="xs:int"/>
+<xs:element name="templateDescription" type="xs:string" minOccurs="0"/>
+<xs:element name="templateID" type="xs:int"/>
+<xs:element name="templateName" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="IntegerList">
+<xs:sequence>
+<xs:element name="integerList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="OrderListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Order" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+</xs:schema>

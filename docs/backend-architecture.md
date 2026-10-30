@@ -183,7 +183,7 @@ Commands are **not** sent through NOTIFY. They go to Temporal, which is durable 
 |---|---|---|---|
 | `OrderWorkflow` | `order-{order_id}` | Until all positions finish or the order is cancelled | Creates the order or quote in Plunet. For a quote, **waits for acceptance**. Then starts one child per position and tracks the summary. |
 | `PositionWorkflow` (child) | `position-{position_id}` | One position | Runs the task chain from the template; handles pause, cancel, retry, restart. |
-| `PlunetSyncWorkflow` | `plunet-sync` (Temporal **Schedule**, every 2 min) | Recurring | Reconciliation: reads job and quote status (and prices) from Plunet and **signals** the affected workflows. Backs up Plunet callbacks. |
+| `PlunetSyncWorkflow` | `plunet-sync` (Temporal **Schedule**, every 2 min) | Recurring | Reconciliation: reads job and quote status (and prices) from Plunet and **signals** the affected workflows. The only sync path from Plunet (no callbacks). |
 
 Task queues: `fox-orchestration` (workflows plus fast activities) and `fox-plunet` (SOAP activities, low concurrency so Plunet is not flooded).
 
@@ -200,7 +200,7 @@ class PositionWorkflow:
         self.cancel_reason: str | None = None
         self.retry_requested = False
         self.restart_from: int | None = None
-        self.plunet_status: dict[int, str] = {}   # filled by signals (Plunet callbacks or sync)
+        self.plunet_status: dict[int, str] = {}   # filled by signals from PlunetSyncWorkflow
 
     @workflow.run
     async def run(self, inp: PositionInput) -> PositionResult:
@@ -230,7 +230,7 @@ class PositionWorkflow:
 | Task | Kind | How it runs |
 |---|---|---|
 | `IMPORT` | automatic | Activity: fetch `.xliff` from Polylang → parse → store segments → upload the file to the Plunet item. |
-| `PM`, `TRA`, `REV` (and other Plunet job types) | **human, in Plunet** | Activity creates or assigns the Plunet Job, then the workflow **waits** for a `plunet_job_status` signal (from Plunet callbacks, with `PlunetSyncWorkflow` as backup) with a timer for overdue alerts. The task state is `WAITING` while assigned and `RUNNING` while `IN_PROGRESS`. |
+| `PM`, `TRA`, `REV` (and other Plunet job types) | **human, in Plunet** | Activity creates or assigns the Plunet Job, then the workflow **waits** for a `plunet_job_status` signal (from `PlunetSyncWorkflow`, every 2 min) with a timer for overdue alerts. The task state is `WAITING` while assigned and `RUNNING` while `IN_PROGRESS`. |
 | `QA` | automatic | Activity: checks on every target segment (rules below). A **blocking** finding is a business failure: the task becomes `FAILED` and the workflow waits for Retry, Restart or Cancel. Warnings are logged and shown, but do not stop the workflow. |
 | `DELIVER` | automatic | Activity per destination: `POLYLANG` (create the translated post + `translations[...]` link), `ENDPOINT` (POST), or `NONE` (no-op). |
 
@@ -244,7 +244,7 @@ class PositionWorkflow:
 | Target is not well-formed XML | **Blocking** |
 | Target identical to source (segments longer than 3 words) | Warning |
 | Numbers differ between source and target | Warning |
-| Length over `maxwidth` (when the XLIFF sets it) or over 150% of the source | Warning |
+| Length over `maxwidth` (when the XLIFF sets it) or over 150% of the source (sources of 10+ characters) | Warning |
 | Leading or trailing whitespace differs; double spaces | Warning |
 | Terminology (glossary) | Later; warning |
 
@@ -263,7 +263,7 @@ All controls are **Workflow Updates**: they are synchronous, validated, and retu
 | Retry | update `retry` | Valid only when the current task is `FAILED`; re-runs it (`attempts + 1`). |
 | Restart from… | update `restart_from(index, reason?)` | Moves the cursor back; later tasks are reset to `PENDING`. |
 | Cancel | update `cancel(reason)` | Sets the reason; the workflow cancels running activities, runs the compensation activity (Plunet Jobs → `CANCELED`), then ends as `CANCELLED`. |
-| Accept quote | signal `quote_accepted` on `OrderWorkflow` | From the api (button) **or** from Plunet (callback, or `PlunetSyncWorkflow` as backup). Idempotent: the second signal is ignored. |
+| Accept quote | signal `quote_accepted` on `OrderWorkflow` | From the api (button) **or** from Plunet (detected by `PlunetSyncWorkflow`). Idempotent: the second signal is ignored. |
 | Bulk actions | api loops over positions | Same updates per `PositionWorkflow`. |
 
 Every control also writes an `ACTION` event (actor, reason), so it shows in the Logs tab and the activity feed in real time.
@@ -296,7 +296,7 @@ Activities must be **idempotent** (Temporal can re-run them): writes are keyed b
 **Decision:** Plunet and FOX MLO stay in sync and show the same states. Plunet is the system of record for orders, quotes, items, jobs, assignments and prices. FOX MLO orchestrates and mirrors.
 
 - One `PlunetGateway` (wrapping the existing `plunet_client.py`) used **only** by activities, with session reuse and re-login on expiry.
-- Calls used: order or quote creation, item creation per position, job creation per task, job status reads and writes, job price reads, document upload, quote → order conversion, resource and customer lists.
+- Calls used: order or quote creation, item creation per position, job creation per task, job status reads and writes, job price reads, document upload, quote status and the order created from a quote (the SOAP API cannot convert a quote itself; see the implementation plan, "Still open" #3), resource and customer lists.
 
 ### 6.1 Shared states
 
@@ -322,9 +322,9 @@ Automatic tasks (IMPORT, QA, DELIVER) have no Plunet job. Their result is writte
 | Change made in… | How it reaches the other side |
 |---|---|
 | **FOX MLO** (create, cancel, restart, assign, accept quote) | The workflow calls a Plunet activity first; the local state is updated only after Plunet confirms. Plunet stays the source of truth. |
-| **Plunet** (PM assigns a translator, translator delivers, job cancelled, quote accepted) | **Callbacks** (Plunet `CallbackType`/`EventType`) → `POST /api/v1/plunet/callbacks` → signal the affected workflow. **Polling** (`PlunetSyncWorkflow`, every 2 min) runs as a reconciliation safety net and catches anything a callback missed. |
+| **Plunet** (PM assigns a translator, translator delivers, job cancelled, quote accepted) | **Polling** (`PlunetSyncWorkflow`, every 2 min) reads job, quote and price changes and signals the affected workflows. Plunet callbacks are not used (decision 2026-10-30). |
 
-Workflows don't care whether a signal came from a callback or from polling, and signals are idempotent: an unchanged status is ignored.
+Signals are idempotent: an unchanged status is ignored.
 
 **Assignments** can be made in either system: in Plunet by the PM (picked up by sync), or in FOX MLO (written to Plunet by an activity).
 
@@ -376,7 +376,6 @@ Analytics
   GET    /api/v1/analytics/summary         ?from&to&group_by=pm|customer|order
 
 Plunet
-  POST   /api/v1/plunet/callbacks          Plunet event callbacks → workflow signals
 
 Health
   GET    /api/v1/health                    postgres, temporal, plunet, polylang
@@ -417,7 +416,7 @@ api ─► update retry ─► validator OK ─► QA runs again (attempt 2) ─
 - **Hosting:** a single VPS runs everything (decision for now). Plan for about 2 GB RAM for Temporal and Postgres together; split them out if load grows.
 - **Temporal versions:** server and admin-tools `1.32.1`, UI `2.57.0`, Python SDK `temporalio 1.35.0`. Upgrades go one minor version at a time; the `temporal-setup` job applies schema updates before the server starts.
 - **temporal-ui** binds to `127.0.0.1:8088` only; reach it through an SSH tunnel. It must never be exposed through the public proxy.
-- **Plunet callbacks:** need an HTTPS route from Plunet to the VPS (`/api/v1/plunet/callbacks`), protected by a shared secret in the URL or a header and by the proxy's IP allowlist if possible.
+- **Plunet sync:** polling only (no inbound route from Plunet). If callbacks are added later, they need an HTTPS route protected by a shared secret and an IP allowlist.
 - **Temporal namespace:** `fox-mlo`, with workflow history retention of 30 days.
 - **Health:** `/health` checks Postgres, the Temporal client connection, Plunet login, and Polylang reachability.
 - **Logging:** structured JSON logs from api and worker. Business logs go to `events`, technical logs go to stdout.
