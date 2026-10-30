@@ -8,3 +8,4 @@ const mode = import.meta.env.VITE_API_MODE === 'http' ? 'http' : 'mock';
 export const api: Api = mode === 'http' ? httpApi : (await import('./mock/engine')).mockApi;
 
 export * from './types';
+export { getActor, setActor } from './actor';

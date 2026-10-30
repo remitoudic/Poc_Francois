@@ -11,12 +11,13 @@ import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from app.activities import content, plunet, projection
     from app.activities.common import RETRY
-    from app.domain.enums import EventKind, OrderKind, OrderStatus, WorkflowStatus
+    from app.domain.enums import EventKind, EventLevel, OrderKind, OrderStatus, WorkflowStatus
     from app.integrations.plunet.enums import ProjectType
     from app.workflows.models import (
         OrderChange,
@@ -89,32 +90,45 @@ class OrderWorkflow:
 
         await workflow.wait_condition(lambda: bool(self.accepted or self.rejected or self.converted_order_id))
         if self.rejected and not self.converted_order_id:
-            if not self.rejected.in_plunet:
-                await self._plunet(plunet.plunet_set_quote_status, plan.order_id, "REJECTED")
-            await self._order(
-                status=OrderStatus.REJECTED, message="Quote rejected" + (" in Plunet" if self.rejected.in_plunet else ""),
-                actor=self.rejected.actor, reason=self.rejected.reason,
-                kind=EventKind.STATE if self.rejected.in_plunet else EventKind.ACTION,
-            )
-            return OrderStatus.REJECTED
+            return await self._reject(plan)
 
         if self.accepted and not self.converted_order_id:
             if not self.accepted.in_plunet:
                 await self._plunet(plunet.plunet_set_quote_status, plan.order_id, "ACCEPTED")  # Plunet first
             await self._order(
-                status=OrderStatus.AWAITING_ACCEPTANCE,
+                status=OrderStatus.ACCEPTED,
                 message="Quote accepted" + (" in Plunet" if self.accepted.in_plunet else "")
                 + "; waiting for the PM to convert it into an order in Plunet",
                 actor=self.accepted.actor, kind=EventKind.STATE if self.accepted.in_plunet else EventKind.ACTION,
             )
             await workflow.wait_condition(lambda: bool(self.converted_order_id or self.rejected))
             if not self.converted_order_id:
-                await self._order(status=OrderStatus.REJECTED, message="Quote cancelled in Plunet before conversion")
-                return OrderStatus.REJECTED
+                return await self._reject(plan, before_conversion=True)
 
         number = await self._plunet(plunet.plunet_adopt_order, plan.order_id, self.converted_order_id)
         await self._order(status=OrderStatus.RUNNING, message=f"Quote converted into Plunet order {number}; workflows start")
         return None
+
+    async def _reject(self, plan: OrderPlan, before_conversion: bool = False) -> OrderStatus:
+        decision = self.rejected
+        if not decision.in_plunet:
+            try:
+                await self._plunet(plunet.plunet_set_quote_status, plan.order_id, "REJECTED")  # Plunet first
+            except ActivityError as err:
+                # The customer's decision stands; the PM updates the quote in Plunet by hand.
+                cause = err.cause.message if isinstance(err.cause, ApplicationError) else str(err.cause or err)
+                await self._order(
+                    message=f"Plunet quote not set to REJECTED ({cause}); update it in Plunet",
+                    level=EventLevel.WARN, kind=EventKind.LOG,
+                )
+        where = " in Plunet" if decision.in_plunet else ""
+        await self._order(
+            status=OrderStatus.REJECTED,
+            message=("Quote withdrawn before conversion" if before_conversion else "Quote rejected") + where,
+            actor=decision.actor, reason=decision.reason,
+            kind=EventKind.STATE if decision.in_plunet else EventKind.ACTION,
+        )
+        return OrderStatus.REJECTED
 
     async def _run_positions(self, plan: OrderPlan) -> OrderStatus:
         self.started_positions = True

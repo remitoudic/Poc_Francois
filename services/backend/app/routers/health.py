@@ -1,11 +1,12 @@
 import httpx
 from fastapi import APIRouter, Depends, Request
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.services.plunet_service import PlunetService
+from app.integrations.plunet import get_plunet_gateway
 from app.temporal.client import get_temporal_client
 
 router = APIRouter(prefix="/health", tags=["Health"])
@@ -45,9 +46,13 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         polylang_status = f"UNHEALTHY: {e}"
 
-    # Check Plunet API Version
-    plunet_svc = PlunetService()
-    plunet_status = plunet_svc.get_server_version()
+    # Plunet through the gateway the workflows use (the in-memory fake with PLUNET_MODE=fake)
+    settings = get_settings()
+    try:
+        version = await run_in_threadpool(lambda: get_plunet_gateway().version())
+        plunet_status = {"success": True, "version": version, "mode": settings.PLUNET_MODE}
+    except Exception as e:
+        plunet_status = {"success": False, "error": str(e), "mode": settings.PLUNET_MODE}
 
     return {
         "status": "ONLINE",

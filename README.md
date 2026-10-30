@@ -44,7 +44,7 @@ POSTGRES_HOST_PORT=5433
 | Temporal UI | [http://localhost:8088](http://localhost:8088) (local only) |
 | PostgreSQL | `localhost:5433` |
 
-The app runs on demo data in the browser until it is connected to the API (phase 6). To try it against the real backend, run the frontend with `VITE_API_MODE=http npm run dev` in `services/frontend` (the Docker setup gets this switch in phase 6).
+The app talks to the API. To show the UI on simulated data instead (no backend needed), start it with `VITE_API_MODE=mock`: `VITE_API_MODE=mock docker compose up -d frontend`, or `VITE_API_MODE=mock npm run dev` in `services/frontend`.
 
 ## Local development without Plunet
 

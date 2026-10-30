@@ -37,6 +37,7 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 
 MAX_POSITIONS = 500
 _OPEN_QUOTE = (OrderStatus.DRAFT, OrderStatus.AWAITING_ACCEPTANCE)
+_REJECTABLE = (*_OPEN_QUOTE, OrderStatus.ACCEPTED)  # the customer may still withdraw before conversion
 _CLOSED = (OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REJECTED)
 
 
@@ -182,10 +183,13 @@ async def _start_order(temporal: Client, order_id: int) -> None:
         raise HTTPException(503, f"Order {order_id} is saved but its workflow did not start: {err.detail}") from err
 
 
-async def _quote_signal(order_id: int, signal, decision: QuoteDecision, session: AsyncSession, temporal: Client):
+async def _quote_signal(
+    order_id: int, signal, decision: QuoteDecision, session: AsyncSession, temporal: Client, allowed: tuple
+):
     order = await _order_or_404(session, order_id)
-    if order.kind != OrderKind.QUOTE or order.status not in _OPEN_QUOTE:
-        raise HTTPException(409, "Only an open quote can be accepted or rejected")
+    if order.kind != OrderKind.QUOTE or order.status not in allowed:
+        verb = "accepted" if allowed is _OPEN_QUOTE else "rejected"
+        raise HTTPException(409, f"Only an open quote can be {verb}")
     async with temporal_errors("order"):
         await temporal.get_workflow_handle(order_workflow_id(order_id)).signal(signal, decision)
     return await views.order_detail(session, await _order_or_404(session, order_id))
@@ -199,7 +203,9 @@ async def accept_quote(
     temporal: Client = Depends(get_temporal),
 ):
     """The customer accepted: FOX MLO sets ACCEPTED in Plunet; positions start once the PM converts it."""
-    return await _quote_signal(order_id, OrderWorkflow.quote_accepted, QuoteDecision(actor=actor), session, temporal)
+    return await _quote_signal(
+        order_id, OrderWorkflow.quote_accepted, QuoteDecision(actor=actor), session, temporal, _OPEN_QUOTE
+    )
 
 
 @router.post("/{order_id}/reject", response_model=OrderDetail, status_code=202)
@@ -211,7 +217,7 @@ async def reject_quote(
     temporal: Client = Depends(get_temporal),
 ):
     decision = QuoteDecision(actor=actor, reason=body.reason if body else None)
-    return await _quote_signal(order_id, OrderWorkflow.quote_rejected, decision, session, temporal)
+    return await _quote_signal(order_id, OrderWorkflow.quote_rejected, decision, session, temporal, _REJECTABLE)
 
 
 _ORDER_ACTIONS = {

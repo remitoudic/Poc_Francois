@@ -85,6 +85,8 @@ def is_overdue(order: Order) -> bool:
 def _position_note(order: Order, position: Position, delivered: dict[int, str]) -> str | None:
     status = position.status
     if order.kind == OrderKind.QUOTE and status == WorkflowStatus.NOT_STARTED:
+        if order.status == OrderStatus.ACCEPTED:
+            return "Starts when the PM converts the quote into an order in Plunet"
         return "Starts when the quote is accepted"
     if status == WorkflowStatus.PAUSED:
         return "Paused · tasks assigned to people continue in Plunet"

@@ -329,7 +329,8 @@ async def test_quote_waits_and_double_acceptance_starts_positions_once(env):
 
         await handle.signal(OrderWorkflow.quote_accepted, QuoteDecision(actor="Claire"))
         await handle.signal(OrderWorkflow.quote_accepted, QuoteDecision(actor="plunet", in_plunet=True))
-        await until(lambda: ("plunet_set_quote_status", (20, "ACCEPTED")) in fakes.world.calls)
+        await until(lambda: any(c.status == OrderStatus.ACCEPTED for c in fakes.world.order_changes))
+        assert ("plunet_set_quote_status", (20, "ACCEPTED")) in fakes.world.calls
         await handle.signal(OrderWorkflow.quote_converted, QuoteConverted(plunet_order_id=777))
         await handle.signal(OrderWorkflow.quote_converted, QuoteConverted(plunet_order_id=778))
         result = await handle.result()
@@ -354,6 +355,38 @@ async def test_quote_rejected_in_plunet_runs_nothing(env):
         assert await handle.result() == OrderStatus.REJECTED
     assert ("plunet_set_quote_status", (21, "REJECTED")) not in fakes.world.calls  # already true in Plunet
     assert fakes.world.count("set_position_workflow") == 0
+
+
+async def test_accepted_quote_withdrawn_in_fox_mlo_is_rejected_in_plunet(env):
+    fakes.world.add_order(23, OrderKind.QUOTE, [231])
+    fakes.world.add_position(231, AUTO, order_id=23)
+    async with workers(env):
+        handle = await env.client.start_workflow(
+            OrderWorkflow.run, OrderInput(order_id=23, plunet_queue=PLUNET_QUEUE), id=f"order-23-{uuid.uuid4().hex[:6]}", task_queue=QUEUE,
+        )
+        await until(lambda: any(c.status == OrderStatus.AWAITING_ACCEPTANCE for c in fakes.world.order_changes))
+        await handle.signal(OrderWorkflow.quote_accepted, QuoteDecision(actor="Claire"))
+        await until(lambda: any(c.status == OrderStatus.ACCEPTED for c in fakes.world.order_changes))
+        await handle.signal(OrderWorkflow.quote_rejected, QuoteDecision(actor="Claire", reason="Budget cut"))
+        assert await handle.result() == OrderStatus.REJECTED
+    assert ("plunet_set_quote_status", (23, "REJECTED")) in fakes.world.calls
+    last = fakes.world.order_changes[-1]
+    assert last.status == OrderStatus.REJECTED and last.message == "Quote withdrawn before conversion" and last.reason == "Budget cut"
+
+
+async def test_rejection_stands_when_plunet_refuses_the_status(env):
+    fakes.world.add_order(24, OrderKind.QUOTE, [241])
+    fakes.world.add_position(241, AUTO, order_id=24)
+    fakes.world.refused_quote_status = {"REJECTED"}
+    async with workers(env):
+        handle = await env.client.start_workflow(
+            OrderWorkflow.run, OrderInput(order_id=24, plunet_queue=PLUNET_QUEUE), id=f"order-24-{uuid.uuid4().hex[:6]}", task_queue=QUEUE,
+        )
+        await until(lambda: any(c.status == OrderStatus.AWAITING_ACCEPTANCE for c in fakes.world.order_changes))
+        await handle.signal(OrderWorkflow.quote_rejected, QuoteDecision(actor="Claire"))
+        assert await handle.result() == OrderStatus.REJECTED
+    warning = next(c for c in fakes.world.order_changes if c.level == EventLevel.WARN)
+    assert "not set to REJECTED" in warning.message and "not allowed" in warning.message
 
 
 async def test_order_runs_positions_directly(env):

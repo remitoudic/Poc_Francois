@@ -6,12 +6,20 @@ import {
   type OrderFilters,
 } from './types';
 
+import { getActor } from './actor';
+
 const BASE = '/api/v1';
+
+function actorHeader(): Record<string, string> {
+  const actor = getActor();
+  // Percent-encoded: header values cannot carry every character a name may have (the server decodes it).
+  return actor ? { 'X-Fox-Actor': encodeURIComponent(actor) } : {};
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...actorHeader(), ...init?.headers },
   });
   if (!res.ok) {
     let message = res.statusText;

@@ -11,6 +11,7 @@ class OrderKind(StrEnum):
 class OrderStatus(StrEnum):
     DRAFT = "DRAFT"
     AWAITING_ACCEPTANCE = "AWAITING_ACCEPTANCE"  # quote sent, no workflow runs
+    ACCEPTED = "ACCEPTED"  # quote accepted; waits for the PM to convert it in Plunet
     REJECTED = "REJECTED"
     RUNNING = "RUNNING"
     NEEDS_ATTENTION = "NEEDS_ATTENTION"  # at least one position failed or paused

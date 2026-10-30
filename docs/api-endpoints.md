@@ -3,7 +3,7 @@
 Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## Health & Status
-* `GET /api/v1/health`: Checks PostgreSQL, the realtime listener, Temporal, Polylang and the Plunet server version.
+* `GET /api/v1/health`: Checks PostgreSQL, the realtime listener, Temporal, Polylang and Plunet (`plunet.mode`: `soap` or `fake`; `version` from the server).
 * `GET /api/v1/health/live`: Liveness only (used by Docker healthchecks).
 
 ## Realtime (`/api/v1/events`)
@@ -34,7 +34,7 @@ Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/doc
 * `GET /api/v1/orders`: `?kind&status&pm&customer&attention&q&limit&offset`, newest first.
 * `POST /api/v1/orders`: Creates an order or quote (one position per post × target language) and starts its workflow. 201 with the order; 422 on invalid input; 503 if the workflow could not start (the order is kept as `DRAFT`).
 * `GET /api/v1/orders/{id}`: Order with positions, tasks and totals.
-* `POST /api/v1/orders/{id}/accept` · `/reject` (body: `reason`, optional): Open quotes only, else 409.
+* `POST /api/v1/orders/{id}/accept` · `/reject` (body: `reason`, optional): accept needs a `DRAFT` or `AWAITING_ACCEPTANCE` quote; reject also takes an `ACCEPTED` one (not yet converted). Else 409. After acceptance the quote is `ACCEPTED` until the PM converts it in Plunet.
 * `POST /api/v1/orders/{id}/actions`: `{action: pause | resume | retry_failed}` on every position it fits.
 
 ## Positions (`/api/v1/positions`)
@@ -56,7 +56,7 @@ Interactive Swagger docs: [http://localhost:8000/docs](http://localhost:8000/doc
 ## Analytics
 * `GET /api/v1/analytics/summary`: `?group_by=pm|customer&from&to`.
 
-All write calls take an optional `X-Fox-Actor` header (the name shown in the logs) until authentication exists.
+All write calls take an optional `X-Fox-Actor` header (the name shown in the logs, percent-encoded so any name fits in a header) until authentication exists.
 
 ## Dev (`/api/v1/dev`, only with `DEV_ENDPOINTS=true`)
 Temporary until the v2 API (phase 5). Never enabled in production.

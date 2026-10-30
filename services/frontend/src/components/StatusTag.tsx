@@ -8,7 +8,7 @@ const WF_TONE: Record<WorkflowStatus, Tone> = {
   NOT_STARTED: 'muted', RUNNING: 'run', WAITING: 'wait', PAUSED: 'pause', FAILED: 'fail', CANCELLED: 'muted', COMPLETED: 'done',
 };
 const ORDER_TONE: Record<OrderStatus, Tone> = {
-  DRAFT: 'muted', AWAITING_ACCEPTANCE: 'muted', REJECTED: 'muted', RUNNING: 'run', NEEDS_ATTENTION: 'fail', COMPLETED: 'done', CANCELLED: 'muted',
+  DRAFT: 'muted', AWAITING_ACCEPTANCE: 'muted', ACCEPTED: 'wait', REJECTED: 'muted', RUNNING: 'run', NEEDS_ATTENTION: 'fail', COMPLETED: 'done', CANCELLED: 'muted',
 };
 export const TASK_TONE: Record<TaskStatus, Tone> = {
   PENDING: 'muted', WAITING: 'wait', RUNNING: 'run', DONE: 'done', FAILED: 'fail', SKIPPED: 'muted', CANCELLED: 'muted',

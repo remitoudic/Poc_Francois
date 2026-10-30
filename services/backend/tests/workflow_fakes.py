@@ -50,6 +50,7 @@ class World:
         self.job_ids = itertools.count(88200)
         self.task_jobs: dict[int, int] = {}
         self.cancel_fails = False  # plunet_cancel_position raises a BusinessError
+        self.refused_quote_status: set[str] = set()  # plunet_set_quote_status refuses these
 
     def add_position(self, position_id: int, types: list[TaskType] = FULL, order_id: int = 1,
                      deadline: datetime | None = None) -> PositionPlan:
@@ -180,6 +181,8 @@ def plunet_create_project(order_id: int) -> ProjectRef:
 @fake("plunet_set_quote_status")
 def plunet_set_quote_status(order_id: int, status: str) -> None:
     _log("plunet_set_quote_status", order_id, status)
+    if status in world.refused_quote_status:
+        raise ApplicationError(f"status change to {status} not allowed", type=BUSINESS_ERROR, non_retryable=True)
 
 
 @fake("plunet_adopt_order")

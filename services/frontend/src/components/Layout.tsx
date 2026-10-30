@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { api } from '../api';
+import { api, getActor, setActor } from '../api';
 import { useResource } from '../hooks/useResource';
 import { useI18n, type Lang } from '../i18n';
 
@@ -21,6 +22,7 @@ export function Layout() {
   const { t, lang, setLang } = useI18n();
   const health = useResource(loadHealth, []);
   const healthy = health.data === true;
+  const [actor, setActorName] = useState(getActor);
 
   return (
     <div className="shell">
@@ -44,6 +46,17 @@ export function Layout() {
               {healthy ? t('health.ok') : t('health.degraded')}
             </span>
           )}
+          <label className="actor" title={t('nav.actor.hint')}>
+            <span className="actor__label">{t('nav.actor')}</span>
+            <input
+              className="actor__input"
+              value={actor}
+              maxLength={100}
+              placeholder={t('nav.actor.placeholder')}
+              onChange={(e) => setActorName(e.target.value)}
+              onBlur={() => setActor(actor)}
+            />
+          </label>
           <div role="group" aria-label={t('nav.language')} className="seg">
             {(['en', 'fr'] as Lang[]).map((l) => (
               <button key={l} type="button" aria-pressed={lang === l} className="seg__btn" onClick={() => setLang(l)}>
