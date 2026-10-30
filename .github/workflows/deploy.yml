@@ -73,7 +73,7 @@ jobs:
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             echo "=== docker compose ps ==="
             docker compose ps || true
-            echo "=== backend logs (last 50 lines) ==="
-            docker compose logs --tail 50 backend || true
+            echo "=== api, worker and temporal logs (last 50 lines) ==="
+            docker compose logs --tail 50 api worker temporal || true
             echo "=== frontend logs (last 50 lines) ==="
             docker compose logs --tail 50 frontend || true

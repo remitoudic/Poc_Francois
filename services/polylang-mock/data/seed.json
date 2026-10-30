@@ -1,0 +1,86 @@
+{
+  "site": "maison-lumiere.com",
+  "languages": [
+    {"name": "English", "slug": "en", "locale": "en_US", "is_default": true},
+    {"name": "Français", "slug": "fr", "locale": "fr_FR"},
+    {"name": "Deutsch (Österreich)", "slug": "de-at", "locale": "de_AT"},
+    {"name": "Italiano", "slug": "it", "locale": "it_IT"},
+    {"name": "Español", "slug": "es", "locale": "es_ES"}
+  ],
+  "posts": [
+    {
+      "id": 412, "type": "page", "lang": "en", "slug": "spring-collection",
+      "title": "Spring collection — overview",
+      "segments": [
+        "Our spring collection celebrates light fabrics and natural colours.",
+        "Discover {0} new pieces designed in our Paris atelier.",
+        "Every item ships within %s business days.",
+        "Linen, cotton and silk, chosen for comfort and durability."
+      ],
+      "translations": {"fr": 512}
+    },
+    {
+      "id": 512, "type": "page", "lang": "fr", "slug": "collection-printemps",
+      "title": "Collection printemps — aperçu",
+      "segments": [
+        "Notre collection de printemps célèbre les tissus légers et les couleurs naturelles.",
+        "Découvrez {0} nouvelles pièces conçues dans notre atelier parisien.",
+        "Chaque article est expédié sous %s jours ouvrés.",
+        "Lin, coton et soie, choisis pour le confort et la durabilité."
+      ],
+      "translations": {"en": 412}
+    },
+    {
+      "id": 418, "type": "post", "lang": "en", "slug": "linen-shirt",
+      "title": "Linen shirt — product page",
+      "segments": [
+        "A relaxed linen shirt for warm days.",
+        "Available in {count} colours and sizes XS to XXL.",
+        "Machine wash at 30°C."
+      ],
+      "translations": {}
+    },
+    {
+      "id": 421, "type": "page", "lang": "en", "slug": "care-guide",
+      "title": "Care guide",
+      "segments": [
+        "Wash linen inside out to protect the fibres.",
+        "Dry flat in the shade.",
+        "Iron while slightly damp for the best result."
+      ],
+      "translations": {"de-at": 621}
+    },
+    {
+      "id": 621, "type": "page", "lang": "de-at", "slug": "pflegehinweise",
+      "title": "Pflegehinweise",
+      "segments": [
+        "Leinen auf links waschen, um die Fasern zu schützen.",
+        "Liegend im Schatten trocknen.",
+        "Leicht feucht bügeln für das beste Ergebnis."
+      ],
+      "translations": {"en": 421}
+    },
+    {
+      "id": 433, "type": "post", "lang": "en", "slug": "behind-the-atelier",
+      "title": "Behind the atelier",
+      "segments": [
+        "Every piece begins at the cutting table.",
+        "Over {0} artisans work in our atelier.",
+        "Shipped in %s business days.",
+        "Linen is grown in Normandy.",
+        "We visit our weavers twice a year."
+      ],
+      "translations": {}
+    },
+    {
+      "id": 440, "type": "page", "lang": "en", "slug": "shipping-returns",
+      "title": "Shipping & returns",
+      "segments": [
+        "Free shipping on orders over %1$s.",
+        "Returns are accepted within 30 days.",
+        "Contact us at support@example.com for help."
+      ],
+      "translations": {}
+    }
+  ]
+}

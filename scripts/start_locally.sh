@@ -51,7 +51,7 @@ RETRY_COUNT=0
 until curl -fsS "http://localhost:${BACKEND_PORT}/api/v1/health" >/dev/null 2>&1; do
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ "${RETRY_COUNT}" -ge "${MAX_RETRIES}" ]; then
-    echo "[WARN] Backend health check did not respond within ${MAX_RETRIES}s. Check logs with: docker compose logs backend"
+    echo "[WARN] Backend health check did not respond within ${MAX_RETRIES}s. Check logs with: docker compose logs api"
     break
   fi
   sleep 1

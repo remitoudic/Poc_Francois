@@ -1,3 +1,23 @@
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fox_user}:${POSTGRES_PASSWORD:-fox_password}@postgres:5432/${POSTGRES_DB:-fox_mlo}
+  PLUNET_BASE_URL: ${PLUNET_BASE_URL:-https://portal.foxtranslations.com/}
+  PLUNET_USERNAME: ${PLUNET_USERNAME}
+  PLUNET_PASSWORD: ${PLUNET_PASSWORD}
+  DEFAULT_DESTINATION_URL: ${DEFAULT_DESTINATION_URL:-http://api:8000/api/v1/etl/simulate-destination}
+  TEMPORAL_ADDRESS: temporal:7233
+  TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-fox-mlo}
+  POLYLANG_BASE_URL: ${POLYLANG_BASE_URL:-http://polylang-mock:8090}
+  POLYLANG_USERNAME: ${POLYLANG_USERNAME:-}
+  POLYLANG_APP_PASSWORD: ${POLYLANG_APP_PASSWORD:-}
+
+x-temporal-db-env: &temporal-db-env
+  DB: postgres12
+  DB_PORT: 5432
+  POSTGRES_SEEDS: postgres
+  POSTGRES_USER: ${POSTGRES_USER:-fox_user}
+  POSTGRES_PWD: ${POSTGRES_PASSWORD:-fox_password}
+  SQL_PASSWORD: ${POSTGRES_PASSWORD:-fox_password}
+
 services:
   postgres:
     build:
@@ -21,26 +41,126 @@ services:
     networks:
       - fox_network
 
-  backend:
+  # One-shot: create or upgrade the Temporal schemas (databases temporal + temporal_visibility).
+  temporal-setup:
+    build:
+      context: ./services/temporal
+      dockerfile: admin-tools.Dockerfile
+    container_name: fox_mlo_temporal_setup
+    command: ["/scripts/setup-postgres.sh"]
+    environment:
+      <<: *temporal-db-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fox_network
+
+  temporal:
+    build:
+      context: ./services/temporal
+      dockerfile: Dockerfile
+    container_name: fox_mlo_temporal
+    restart: unless-stopped
+    environment:
+      <<: *temporal-db-env
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    # No host port: 7233 stays on the internal network.
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7233"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 60
+    depends_on:
+      temporal-setup:
+        condition: service_completed_successfully
+    networks:
+      - fox_network
+
+  # One-shot: register the fox-mlo namespace (30-day retention).
+  temporal-namespace:
+    build:
+      context: ./services/temporal
+      dockerfile: admin-tools.Dockerfile
+    container_name: fox_mlo_temporal_namespace
+    command: ["/scripts/create-namespace.sh"]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-fox-mlo}
+    depends_on:
+      temporal:
+        condition: service_healthy
+    networks:
+      - fox_network
+
+  temporal-ui:
+    image: temporalio/ui:2.57.0
+    container_name: fox_mlo_temporal_ui
+    restart: unless-stopped
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_DEFAULT_NAMESPACE: ${TEMPORAL_NAMESPACE:-fox-mlo}
+    ports:
+      - "127.0.0.1:${TEMPORAL_UI_HOST_PORT:-8088}:8080"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    networks:
+      - fox_network
+
+  polylang-mock:
+    build:
+      context: ./services/polylang-mock
+      dockerfile: Dockerfile
+    container_name: fox_mlo_polylang_mock
+    restart: unless-stopped
+    networks:
+      - fox_network
+
+  api:
     build:
       context: ./services/backend
       dockerfile: Dockerfile
-    container_name: fox_mlo_backend
+    container_name: fox_mlo_api
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-fox_user}:${POSTGRES_PASSWORD:-fox_password}@postgres:5432/${POSTGRES_DB:-fox_mlo}
-      - PLUNET_BASE_URL=${PLUNET_BASE_URL:-https://portal.foxtranslations.com/}
-      - PLUNET_USERNAME=${PLUNET_USERNAME}
-      - PLUNET_PASSWORD=${PLUNET_PASSWORD}
-      - DEFAULT_DESTINATION_URL=${DEFAULT_DESTINATION_URL:-http://backend:8000/api/v1/etl/simulate-destination}
+      <<: *backend-env
     ports:
       - "8000:8000"
     volumes:
       - ./services/backend/app:/app/app
       - ./fixtures:/app/fixtures:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health/live"]
+      interval: 5s
+      timeout: 3s
+      start_period: 20s
+      retries: 30
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - fox_network
+
+  worker:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    container_name: fox_mlo_worker
+    restart: unless-stopped
+    command: ["uv", "run", "--no-sync", "python", "-m", "app.worker"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./services/backend/app:/app/app
+      - ./fixtures:/app/fixtures:ro
+    depends_on:
+      api:
+        condition: service_healthy  # migrations have run
+      temporal-namespace:
+        condition: service_completed_successfully
     networks:
       - fox_network
 
@@ -51,13 +171,13 @@ services:
     container_name: fox_mlo_frontend
     restart: unless-stopped
     environment:
-      - VITE_BACKEND_URL=http://backend:8000
+      - VITE_BACKEND_URL=http://api:8000
     ports:
       - "3000:3000"
     volumes:
       - ./services/frontend/src:/app/src
     depends_on:
-      - backend
+      - api
     networks:
       - fox_network
 

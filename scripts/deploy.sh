@@ -132,7 +132,7 @@ until curl -fsS "http://localhost:${BACKEND_PORT}/api/v1/health" >/dev/null 2>&1
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ "${RETRY_COUNT}" -ge "${MAX_RETRIES}" ]; then
     echo "  ERROR: Backend health check failed after ${MAX_RETRIES}s." >&2
-    docker compose logs --tail 50 backend || true
+    docker compose logs --tail 50 api worker temporal || true
     exit 1
   fi
   sleep 2
