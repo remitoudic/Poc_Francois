@@ -107,7 +107,7 @@ export default function App() {
   useEffect(() => {
     const handleUrlRoute = () => {
       const path = window.location.pathname;
-      const match = path.match(/^\/(\d+)(?:\/([^/]+))?/);
+      const match = path.match(/^\/legacy\/(\d+)(?:\/([^/]+))?/);
       if (match) {
         const jobId = parseInt(match[1], 10);
         const plunetOrderId = match[2] && match[2] !== '0' ? match[2] : undefined;
@@ -167,7 +167,7 @@ export default function App() {
         setSegmentSearch('');
         if (pushState) {
           const orderSlug = jobData.plunet_order_id ?? plunetOrderId ?? '0';
-          window.history.pushState(null, '', `/${jobId}/${orderSlug}`);
+          window.history.pushState(null, '', `/legacy/${jobId}/${orderSlug}`);
         }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -180,7 +180,7 @@ export default function App() {
     setViewMode('dashboard');
     setSelectedJob(null);
     if (pushState) {
-      window.history.pushState(null, '', '/');
+      window.history.pushState(null, '', '/legacy');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -233,7 +233,7 @@ export default function App() {
       setTechSubTab('processed');
       setSegmentSearch('');
       const orderSlug = completedJob.plunet_order_id ?? 0;
-      window.history.pushState(null, '', `/${completedJob.id}/${orderSlug}`);
+      window.history.pushState(null, '', `/legacy/${completedJob.id}/${orderSlug}`);
       fetchData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
