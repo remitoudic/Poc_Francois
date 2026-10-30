@@ -12,7 +12,7 @@ Target design: [`backend-architecture.md`](backend-architecture.md). UX source: 
 | 3 — Integrations | Next | |
 | 4 — Workflows | Planned | |
 | 5 — API v2 | Planned | |
-| 6 — Frontend | Planned | |
+| 6 — Frontend | In progress | New UI built against a mock API (`VITE_API_MODE`, default `mock`); contract in `services/frontend/src/api/types.ts`. Wiring to real endpoints follows phases 3–5. v1 dashboard moved to `/legacy`. |
 | 7 — Hardening | Planned | |
 
 Tests: `cd services/backend && uv run python -m pytest` (15 tests: status mapping, broadcaster, Temporal workflow in the time-skipping test server).
