@@ -1,0 +1,314 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by XML-WS Runtime (https://github.com/eclipse-ee4j/metro-jax-ws). Runtime's version is XML-WS Runtime 4.0.2 git-revision#0264419. --><xs:schema xmlns:tns="http://API.Integration/" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://API.Integration/">
+
+<xs:complexType name="PropertyListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="m_Data" type="tns:PropertyResult" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Result">
+<xs:sequence>
+<xs:element name="statusCode" type="xs:int"/>
+<xs:element name="statusCodeAlphanumeric" type="xs:string" minOccurs="0"/>
+<xs:element name="statusMessage" type="xs:string" minOccurs="0"/>
+<xs:element name="warning_StatusCodeList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PropertyResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Property" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Property">
+<xs:sequence>
+<xs:element name="avaliablePropertyValueIDList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="mainPropertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyNameEnglish" type="xs:string" minOccurs="0"/>
+<xs:element name="propertyType" type="xs:int"/>
+<xs:element name="selectedPropertyValueID" type="xs:int"/>
+<xs:element name="selectedPropertyValueList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="languageResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Language" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Language">
+<xs:sequence>
+<xs:element name="active" type="xs:boolean"/>
+<xs:element name="favorite" type="xs:boolean"/>
+<xs:element name="folderName" type="xs:string" minOccurs="0"/>
+<xs:element name="id" type="xs:int"/>
+<xs:element name="isoCode" type="xs:string" minOccurs="0"/>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="LanguageListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Language" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="CurrencyList">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Currency" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Currency">
+<xs:sequence>
+<xs:element name="currencyID" type="xs:int"/>
+<xs:element name="description" type="xs:string" minOccurs="0"/>
+<xs:element name="isoCode" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PropertyValueListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PropertyValue" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PropertyValue">
+<xs:sequence>
+<xs:element name="active" type="xs:boolean"/>
+<xs:element name="id" type="xs:int"/>
+<xs:element name="label" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="WorkflowListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Workflow" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Workflow">
+<xs:sequence>
+<xs:element name="description" type="xs:string" minOccurs="0"/>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:int"/>
+<xs:element name="type" type="xs:int"/>
+<xs:element name="workflowId" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="CountryListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Country" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Country">
+<xs:sequence>
+<xs:element name="ID" type="xs:int"/>
+<xs:element name="isoCode" type="xs:string" minOccurs="0"/>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PriceUnitListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PriceUnit" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceUnit">
+<xs:sequence>
+<xs:element name="active" type="xs:boolean"/>
+<xs:element name="articleNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="baseUnit" type="xs:string" minOccurs="0"/>
+<xs:element name="description" type="xs:string" minOccurs="0"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="priceUnitID" type="xs:int"/>
+<xs:element name="service" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="TextmoduleListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Textmodule" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Textmodule">
+<xs:sequence>
+<xs:element name="availableValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="customerSpecific" type="xs:boolean"/>
+<xs:element name="dateValue" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="flag" type="xs:string" minOccurs="0"/>
+<xs:element name="flag_MainTextModule" type="xs:string" minOccurs="0"/>
+<xs:element name="jobTypeSpecific" type="xs:boolean"/>
+<xs:element name="selectedValues" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="stringValue" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleLabel" type="xs:string" minOccurs="0"/>
+<xs:element name="textModuleType" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="CallbackListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Callback" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Callback">
+<xs:sequence>
+<xs:element name="benutzerID" type="xs:int"/>
+<xs:element name="callbackType" type="xs:int"/>
+<xs:element name="dataService" type="xs:int"/>
+<xs:element name="errorCount" type="xs:int"/>
+<xs:element name="eventType" type="xs:int"/>
+<xs:element name="mainID" type="xs:int"/>
+<xs:element name="objectType" type="xs:int"/>
+<xs:element name="serverAddress" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="FeedbackCriteriaListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:QualityCriteria" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="QualityCriteria">
+<xs:sequence>
+<xs:element name="active" type="xs:boolean"/>
+<xs:element name="id" type="xs:int"/>
+<xs:element name="koValue" type="xs:double"/>
+<xs:element name="label" type="xs:string" minOccurs="0"/>
+<xs:element name="tooltip" type="xs:string" minOccurs="0"/>
+<xs:element name="weighting" type="xs:double"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="CompanyCodeListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:CompanyCode" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="CompanyCode">
+<xs:sequence>
+<xs:element name="companyCodeID" type="xs:int"/>
+<xs:element name="companyCodeRights" type="xs:boolean"/>
+<xs:element name="description_Long" type="xs:string" minOccurs="0"/>
+<xs:element name="description_Short" type="xs:string" minOccurs="0"/>
+<xs:element name="isCompanyCodeInvoice" type="xs:boolean"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="GenericKeyPairListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:GenericKeyPair" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="GenericKeyPair">
+<xs:sequence>
+<xs:element name="key" type="xs:int"/>
+<xs:element name="value" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="ServiceListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Service" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Service">
+<xs:sequence>
+<xs:element name="abbreviation" type="xs:string" minOccurs="0"/>
+<xs:element name="id" type="xs:int"/>
+<xs:element name="jobCategory" type="xs:string" minOccurs="0"/>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringArrayResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+</xs:schema>

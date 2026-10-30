@@ -1,0 +1,308 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by XML-WS Runtime (https://github.com/eclipse-ee4j/metro-jax-ws). Runtime's version is XML-WS Runtime 4.0.2 git-revision#0264419. --><xs:schema xmlns:tns="http://API.Integration/" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://API.Integration/">
+
+<xs:complexType name="Result">
+<xs:sequence>
+<xs:element name="statusCode" type="xs:int"/>
+<xs:element name="statusCodeAlphanumeric" type="xs:string" minOccurs="0"/>
+<xs:element name="statusMessage" type="xs:string" minOccurs="0"/>
+<xs:element name="warning_StatusCodeList" type="xs:int" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="DateResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:dateTime" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PricelistEntryList">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PricelistEntry" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PricelistEntry">
+<xs:sequence>
+<xs:element name="amountPerUnit" type="xs:double"/>
+<xs:element name="pricePerUnit" type="xs:double"/>
+<xs:element name="priceUnitID" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringArrayResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="JobResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Job" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Job">
+<xs:sequence>
+<xs:element name="countSourceFiles" type="xs:int"/>
+<xs:element name="dueDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="itemID" type="xs:int"/>
+<xs:element name="jobID" type="xs:int"/>
+<xs:element name="jobTypeFull" type="xs:string" minOccurs="0"/>
+<xs:element name="jobTypeShort" type="xs:string" minOccurs="0"/>
+<xs:element name="projectID" type="xs:int"/>
+<xs:element name="projectType" type="xs:int"/>
+<xs:element name="resourceID" type="xs:int"/>
+<xs:element name="startDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="status" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="StringResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceLineListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PriceLine" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceLine">
+<xs:sequence>
+<xs:element name="amount" type="xs:double"/>
+<xs:element name="amount_perUnit" type="xs:double"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="priceLineID" type="xs:int"/>
+<xs:element name="priceUnitID" type="xs:int"/>
+<xs:element name="sequence" type="xs:int"/>
+<xs:element name="taxType" type="xs:int"/>
+<xs:element name="time_perUnit" type="xs:double"/>
+<xs:element name="unit_price" type="xs:double"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Job" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="JobIN">
+<xs:sequence>
+<xs:element name="contactPersonID" type="xs:int"/>
+<xs:element name="dueDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="itemID" type="xs:int"/>
+<xs:element name="jobID" type="xs:int"/>
+<xs:element name="projectID" type="xs:int"/>
+<xs:element name="projectType" type="xs:int"/>
+<xs:element name="resourceID" type="xs:int"/>
+<xs:element name="startDate" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="status" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="IntegerResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="xs:int"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PricelistResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Pricelist" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="Pricelist">
+<xs:sequence>
+<xs:element name="ResourcePricelistID" type="xs:int"/>
+<xs:element name="pricelistID" type="xs:int"/>
+<xs:element name="PricelistNameEN" type="xs:string" minOccurs="0"/>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="withWhiteSpace" type="xs:boolean"/>
+<xs:element name="adminPriceListId" type="xs:int"/>
+<xs:element name="adminPriceListPartnerType" type="tns:contactType" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobTrackingTimeIN">
+<xs:sequence>
+<xs:element name="comment" type="xs:string" default=""/>
+<xs:element name="completed" type="xs:double" default="0"/>
+<xs:element name="dateFrom" type="xs:dateTime"/>
+<xs:element name="dateTo" type="xs:dateTime"/>
+<xs:element name="resourceID" type="xs:int"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobTrackingTimeResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:TrackingTimeList" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="TrackingTimeList">
+<xs:sequence>
+<xs:element name="completed" type="xs:double"/>
+<xs:element name="trackingTimeList" type="tns:JobTrackingTime" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobTrackingTime">
+<xs:sequence>
+<xs:element name="resourceID" type="xs:int"/>
+<xs:element name="comment" type="xs:string" minOccurs="0"/>
+<xs:element name="dateFrom" type="xs:dateTime" minOccurs="0"/>
+<xs:element name="dateTo" type="xs:dateTime" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobTrackingTimeListIN">
+<xs:sequence>
+<xs:element name="trackingTimes" type="tns:JobTrackingTimeIN" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="JobMetricResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:JobMetric" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="JobMetric">
+<xs:sequence>
+<xs:element name="amounts" type="tns:Amount" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="totalPrice" type="xs:double"/>
+<xs:element name="totalPriceJobCurrency" type="xs:double"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="Amount">
+<xs:sequence>
+<xs:element name="baseUnitName" type="xs:string" minOccurs="0"/>
+<xs:element name="grossQuantity" type="xs:double" minOccurs="0"/>
+<xs:element name="netQuantity" type="xs:double" minOccurs="0"/>
+<xs:element name="serviceType" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PriceUnitResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PriceUnit" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceUnit">
+<xs:sequence>
+<xs:element name="active" type="xs:boolean"/>
+<xs:element name="articleNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="baseUnit" type="xs:string" minOccurs="0"/>
+<xs:element name="description" type="xs:string" minOccurs="0"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="priceUnitID" type="xs:int"/>
+<xs:element name="service" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PricelistListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:Pricelist" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceLineIN">
+<xs:sequence>
+<xs:element name="amount" type="xs:double"/>
+<xs:element name="amount_perUnit" type="xs:double"/>
+<xs:element name="memo" type="xs:string" minOccurs="0"/>
+<xs:element name="priceLineID" type="xs:int"/>
+<xs:element name="priceUnitID" type="xs:int"/>
+<xs:element name="taxType" type="xs:int"/>
+<xs:element name="time_perUnit" type="xs:double"/>
+<xs:element name="unit_price" type="xs:double"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="PriceLineResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PriceLine" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="PriceUnitListResult">
+<xs:complexContent>
+<xs:extension base="tns:Result">
+<xs:sequence>
+<xs:element name="data" type="tns:PriceUnit" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:simpleType name="contactType">
+<xs:restriction base="xs:string">
+<xs:enumeration value="CUSTOMER"/>
+<xs:enumeration value="RESOURCE"/>
+<xs:enumeration value="MISCELLANEOUS"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:schema>

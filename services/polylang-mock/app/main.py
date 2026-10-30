@@ -13,6 +13,7 @@ Mock-only (not part of Polylang's REST API):
 """
 
 import copy
+import html
 import json
 import re
 from datetime import UTC, datetime
@@ -153,7 +154,8 @@ async def _body(request: Request) -> dict[str, Any]:
 
 def _segments_from_content(content: str) -> list[str]:
     paragraphs = re.findall(r"<p>(.*?)</p>", content, flags=re.S)
-    return [p.strip() for p in paragraphs] or [content.strip()]
+    # Stored unescaped, like the seed; serialisation escapes again.
+    return [html.unescape(p.strip()) for p in paragraphs] or [html.unescape(content.strip())]
 
 
 # --- Routes --------------------------------------------------------------------------------
@@ -266,6 +268,10 @@ async def _update(post_type: str, post_id: int, request: Request, lang: str | No
         post["status"] = body["status"]
     if "segments" in body:
         post["segments"] = body["segments"]
+    elif "content" in body:
+        content = body["content"]
+        content = content.get("raw", "") if isinstance(content, dict) else content
+        post["segments"] = _segments_from_content(content)
     _link(post, _translation_params(request))
     return to_wp(post)
 

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     PLUNET_BASE_URL: str = os.getenv("PLUNET_BASE_URL", "https://portal.foxtranslations.com/")
     PLUNET_USERNAME: str = os.getenv("PLUNET_USERNAME", "")
     PLUNET_PASSWORD: str = os.getenv("PLUNET_PASSWORD", "")
+    PLUNET_MODE: str = "soap"  # "soap" = live portal, "fake" = in-memory gateway (dev/tests)
+    PLUNET_TIMEOUT_SECONDS: float = 30.0
 
     # Destination Server default (built-in simulator or remote)
     DEFAULT_DESTINATION_URL: str = os.getenv(
@@ -34,6 +36,7 @@ class Settings(BaseSettings):
     POLYLANG_BASE_URL: str = "http://polylang-mock:8090"
     POLYLANG_USERNAME: str = ""
     POLYLANG_APP_PASSWORD: str = ""
+    POLYLANG_TIMEOUT_SECONDS: float = 20.0
 
     # Realtime (Postgres LISTEN/NOTIFY)
     EVENTS_CHANNEL: str = "fox_events"

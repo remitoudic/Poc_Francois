@@ -9,13 +9,13 @@ Target design: [`backend-architecture.md`](backend-architecture.md). UX source: 
 | 0 — Foundations | **Done** (branch `feat/backend-v2-temporal`) | Alembic (baseline `0001` adopts the existing v1 tables), async SQLAlchemy next to the sync v1 session, `temporalio 1.35.0`. New packages: `domain/`, `realtime/`, `temporal/`, `workflows/`, `activities/`; routers stay in `app/routers/`. Still to do: `get_actor()`, moving v1 services into `integrations/` (Phase 3). |
 | 1 — Infrastructure | **Done** | `temporal-setup` → `temporal` 1.32.1 → `temporal-namespace` (`fox-mlo`, 720 h); `temporal-ui` 2.57.0 on 127.0.0.1:8088; `worker`; `polylang-mock`; `backend` renamed to `api`. The setup job creates the Temporal databases itself, so `init.sql` is unchanged. |
 | 2 — Data model + realtime | **Done** | Migration `0002`: v2 tables, seeded templates, `events` + `notify_event()` trigger. One LISTEN connection per api process → broadcaster → `GET /api/v1/events/stream` (SSE, scopes, `Last-Event-ID` replay, heartbeat, `resync`). Verified end to end: `POST /api/v1/system/check-workflow` → Temporal → worker activity → `events` → NOTIFY → SSE; a rolled-back insert is never delivered. |
-| 3 — Integrations | Next | |
+| 3 — Integrations | **Done** (branch `feat/backend-phase3-integrations`); smoke test passed on the live portal | Plunet SOAP gateway + in-memory fake, Polylang connector, XLIFF parser and QA rules, WSDL-validated tests. See Phase 3 below. |
 | 4 — Workflows | Planned | |
 | 5 — API v2 | Planned | |
 | 6 — Frontend | In progress | New UI built against a mock API (`VITE_API_MODE`, default `mock`); contract in `services/frontend/src/api/types.ts`. Wiring to real endpoints follows phases 3–5. v1 dashboard moved to `/legacy`. |
 | 7 — Hardening | Planned | |
 
-Tests: `cd services/backend && uv run python -m pytest` (15 tests: status mapping, broadcaster, Temporal workflow in the time-skipping test server).
+Tests: `cd services/backend && uv run python -m pytest` (90 tests: status mapping, broadcaster, Temporal workflow in the time-skipping test server, Plunet gateway against the recorded WSDLs, Polylang connector, XLIFF and QA).
 
 Each phase ends in a working, testable system and can be merged on its own. Phases 1–3 can partly run in parallel.
 
@@ -120,19 +120,31 @@ Each phase ends in a working, testable system and can be merged on its own. Phas
 
 **Goal:** tested gateways for Plunet and Polylang, used only by activities.
 
-- [ ] `PlunetGateway` (refactor `plunet_client.py` and `plunet_service.py`):
-  - session reuse and re-login, typed results, `PlunetError` with business and technical subclasses
-  - `create_order`, `create_quote`, `convert_quote_to_order`, `get_quote_status`
-  - `create_item(order, position)`, `upload_document(item, xliff)`
-  - `create_job(item, task_type)`, `get_job_status(job_id)`, `set_job_status(job_id, CANCELED)`
-  - `list_resources()` (PMs), `list_customers()`
-  - check every SOAP call against the Plunet API doc (`DataOrder30`, `DataItem30`, `DataJob30`, `DataQuote30`)
-- [ ] `PlunetStatusMapper`: `JobStatus` → `TaskStatus` (architecture §6.1). The raw Plunet status is stored; the UI state is derived from it, so both systems always show the same thing.
-- [ ] Write-back calls for two-way sync: `set_job_status`, `assign_resource`, `set_item_status`, `get_job_prices` (cost comes from Plunet job prices).
-- [ ] `SourceConnector` protocol + `PolylangConnector` (httpx, base URL and auth from env).
-- [ ] QA rules as decided (architecture §5.3): blocking = empty target, placeholder mismatch, inline-tag mismatch, malformed XML; warnings = target equals source, number mismatch, length, whitespace.
-- [ ] Move the XLIFF parsing and QA checks from `xliff_processor.py` into pure functions (`parse`, `check_placeholders`, `check_lengths`) that return structured findings.
-- [ ] Recorded fixtures (VCR-style or a fake gateway) so tests do not hit the live Plunet portal.
+- [x] `PlunetGateway` protocol + `SoapPlunetGateway` (`app/integrations/plunet/`):
+  - one shared session, re-login once when Plunet reports an expired UUID; typed pydantic results
+  - errors: `PlunetTechnicalError` (retried) and `PlunetBusinessError` / `PlunetAuthError` (not retried), on top of the shared `TechnicalError` / `BusinessError` in `app/integrations/errors.py`
+  - `create_order`, `create_quote`, `get_quote_status`, `set_quote_status`, `get_order_id_for_quote`, `delete_order`, `delete_quote`
+  - `create_item` (+ language combination), `set_item_status`, `upload_document` (item source folder)
+  - `create_job`, `get_job`, `list_item_jobs`, `set_job_status`, `assign_resource`, `get_job_cost`
+  - `list_customers` (active), `list_project_managers` (active internal resources), `version`
+  - every SOAP call checked against the portal's own WSDLs, recorded in `tests/fixtures/plunet_wsdl/`
+- [x] Status mapping `JobStatus` → `TaskStatus` (`app/domain/plunet_status.py`, done in phase 0); the gateway returns the raw Plunet status name.
+- [x] Write-back calls for two-way sync: `set_job_status`, `assign_resource`, `set_item_status`, `get_job_cost` (sum of the job price lines in project currency).
+- [x] `SourceConnector` protocol (`app/integrations/source.py`) + `PolylangConnector` (httpx, async; `publish_translation` creates or updates the linked post, so it is idempotent).
+- [x] QA rules (architecture §5.3) in `app/xliff/qa.py`; parsing in `app/xliff/parse.py` (XLIFF 1.2 and 2.0, inline-tag signatures, markup without namespaces). Findings match the frontend `QaFinding` type.
+- [x] `FakePlunetGateway` (in-memory) for tests and for running without a portal (`PLUNET_MODE=fake`).
+- [x] Tests: SOAP calls replayed against the recorded WSDLs (unknown operation, argument or field and missing required fields fail), session expiry, error mapping, Polylang connector against the mock app in-process, QA rules. 79 tests.
+- [x] `scripts/plunet_smoke.py --quote` passed on portal.foxtranslations.com (Plunet 10.26.2, 2026-10-30): order, item, document, TRA job, cost, cancel; quote, quote item, release, order lookup; everything deleted afterwards.
+
+The v1 `xliff_processor.py` stays as is for the legacy `/etl` routes and is removed with them in Phase 7.
+
+**Findings from the WSDLs:**
+- The SOAP API has **no call that converts a quote into an order**. Conversion happens in Plunet (decision 6). FOX MLO sets the quote status to `ACCEPTED` and detects the new order through the quote's `orderID` list (`getQuoteObject`), polled by Phase 4. `getOrderIDFirstItem` is not usable: it fails (-100) on unconverted quotes.
+- Items have no language fields on creation; the gateway adds the language pair with `DataItem30.addLanguageCombination` right after `insert2`.
+- Plunet expects its own **language names** ("English", "French"), not codes. The gateway reads the active languages (`DataAdmin30.getAvailableLanguages`) and resolves a Polylang code or locale: exact locale first (`fr_CA` → "French (Canada)"), else the generic language (`de-at` → "German"; there is no German (Austria) on the FOX instance). An unknown language fails before anything is written.
+- A quote accepts a PM and new items only while it is `NEW` / `IN_PREPARATION`. `create_quote` leaves it `IN_PREPARATION`; Phase 4 adds items and documents, then releases it with `PENDING`. If setting the PM fails, the quote is deleted.
+- Job type `TRA` exists on the FOX instance. Job prices come in the project currency (CAD for the test customer).
+- `OrderIN` requires `rate`, `customerContactID` and `orderID`; `ItemIN` requires `status`, `taxType` and `totalPrice`. The gateway sends neutral defaults.
 
 **Done when:** unit tests cover the gateway with fakes, and one manual smoke script creates and cancels a test order on the real Plunet.
 
@@ -144,7 +156,7 @@ Each phase ends in a working, testable system and can be merged on its own. Phas
 
 - [ ] Activities (`activities/`), all idempotent:
   - `projection.record_task_state`, `projection.record_event`, `projection.set_order_status`
-  - `plunet.create_order|create_quote|convert_quote|create_item|create_job|cancel_jobs|upload_document` (queue `fox-plunet`)
+  - `plunet.create_order|create_quote|accept_quote|await_quote_conversion|create_item|create_job|cancel_jobs|upload_document` (queue `fox-plunet`)
   - `polylang.fetch_xliff`, `polylang.publish_translation`
   - `xliff.parse_and_store`, `qa.run_checks`, `deliver.to_endpoint`
 - [ ] Retry policies: technical errors use 5 attempts, exponential backoff up to 5 min. `BusinessError` is listed in `non_retryable_error_types`.
@@ -155,8 +167,8 @@ Each phase ends in a working, testable system and can be merged on its own. Phas
   - query `state` (for debugging and for the api if the projection lags)
   - cancellation: cancel running activity handles, run `cancel_jobs` in a non-cancellable scope, then record `CANCELLED`
 - [ ] `OrderWorkflow`: create in Plunet → if quote, `wait_condition(accepted or rejected)` → start child `PositionWorkflow`s (`parent_close_policy=REQUEST_CANCEL`) → compute order status as children report.
-- [ ] `POST /api/v1/plunet/callbacks`: verifies the shared secret, maps the Plunet event to `(order | job) + status`, and signals the workflow. Register the callbacks in Plunet at worker start (idempotent).
-- [ ] `PlunetSyncWorkflow` as a **Temporal Schedule** (every 2 min, overlap policy `SKIP`): reconciliation. Reads open jobs and quotes from the DB, asks Plunet for status and prices, signals workflows on change, and logs a `WARN` event when it corrects a missed callback.
+- [ ] `PlunetSyncWorkflow` as a **Temporal Schedule** (every 2 min, overlap policy `SKIP`): the **only** sync path from Plunet (decision 1). Reads open jobs and quotes from the DB, asks Plunet for status, assignee and prices, and signals workflows on change. No callbacks.
+- [ ] Job creation defaults (decision 7): due date = position deadline (else order deadline), start date = now, no resource (the PM assigns in Plunet, or FOX MLO assigns through `assign_resource`), price lines left to Plunet's price list for the customer.
 - [ ] Every FOX MLO action that changes a job (cancel, restart, assign) calls Plunet **first** and updates the local state only after Plunet confirms.
 - [ ] `worker.py`: registers workflows and activities on both task queues; graceful shutdown.
 
@@ -227,21 +239,23 @@ Each phase ends in a working, testable system and can be merged on its own. Phas
 | Missed NOTIFY (listener down) | Outbox table + `Last-Event-ID` replay + `resync` refetch. |
 | DB read model and Temporal state drift apart | All writes through `record_task_state`; a workflow `state` query for checks; an admin "re-project" activity. |
 | Temporal upgrades | Pinned image versions; upgrade one minor version at a time; `temporal-setup` applies schema updates before the server starts. |
-| Plunet callbacks cannot reach the VPS | Polling reconciliation already covers every state change, just with up to 2 min delay. |
+| Changes made in Plunet show up late | Polling every 2 min is the only sync path; changes appear within about 2 min. The interval can be lowered if the SOAP load allows. |
 | Temporal shares the Postgres server | Separate databases; monitor connections; split to its own server later if needed. |
 
 ## Decisions (2026-10-30)
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Can Plunet reach the VPS for callbacks? | Probably. Callbacks are the main path; polling every 2 min stays as reconciliation. Check reachability in Phase 4. |
-| 2 | Who owns job data and states? | Plunet and FOX MLO stay in sync with the same states. Plunet is the source of truth; FOX MLO writes changes to Plunet first and mirrors Plunet changes (callbacks + polling). |
+| 1 | Plunet callbacks? | **Not used.** The 2-minute polling (`PlunetSyncWorkflow`) carries the sync alone. |
+| 2 | Who owns job data and states? | Plunet and FOX MLO stay in sync with the same states. Plunet is the source of truth; FOX MLO writes changes to Plunet first and mirrors Plunet changes (polling every 2 min). |
 | 3 | QA rules | Default set in architecture §5.3 (blocking vs warning). |
 | 4 | Cost source | Plunet job prices. |
 | 5 | Hosting | The single VPS, including Temporal, for now. |
+| 6 | Quote acceptance in FOX MLO (the API cannot convert a quote) | FOX MLO sets the quote to `ACCEPTED`; the PM converts it in Plunet; FOX MLO detects the new order and starts the workflows. |
+| 7 | Required job fields | Common defaults until known: due date from the position (else order) deadline, start date now, no resource on creation, prices from Plunet's price list. Adjust once the FOX Plunet setup is confirmed. |
 | – | Temporal version | Latest stable: server 1.32.1, UI 2.57.0, Python SDK 1.35.0. |
 
 ## Still open
 
-1. Which Plunet events can be registered as callbacks on the FOX Plunet instance (license and version 10.26.2)?
-2. Required fields when creating PM, TRA and REV jobs (due date, price list, resource) for the FOX Plunet setup.
+1. Confirm the required job fields on the FOX Plunet setup (decision 7 uses common defaults).
+2. Job type short names `PM` and `REV` on the FOX instance (`TRA` is confirmed); check with `scripts/plunet_smoke.py --job-type PM` / `REV`.
